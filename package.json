@@ -7,7 +7,12 @@
     "claude-code",
     "plugin",
     "audit",
+    "bloat",
+    "cleanup",
+    "ecosystem",
+    "tokens",
     "usage",
-    "profiles"
+    "profiles",
+    "cost"
   ]
 }

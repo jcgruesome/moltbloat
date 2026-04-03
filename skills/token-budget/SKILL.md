@@ -60,7 +60,7 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
    **2c. Plugin CLAUDE.md and instructions**
    Each enabled plugin can inject instructions:
    ```bash
-   for plugin_dir in ~/.claude/plugins/marketplaces/*/; do
+   for plugin_dir in ~/.claude/plugins/cache/*/*/; do
      name=$(basename "$plugin_dir")
      size=0
      # Check CLAUDE.md
@@ -93,7 +93,7 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
    ```bash
    # Count total skills across all plugins
    total=0
-   for plugin_dir in ~/.claude/plugins/marketplaces/*/skills/*/; do
+   for plugin_dir in ~/.claude/plugins/cache/*/*/skills/*/; do
      total=$((total + 1))
    done 2>/dev/null
    echo "Total skills: $total"

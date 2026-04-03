@@ -1,7 +1,7 @@
 #!/bin/bash
 # Lightweight usage tracker — logs tool/skill/agent invocations to ~/.moltbloat/usage.jsonl
 # Called by PostToolUse hook. Receives tool name and target via env vars.
-# Designed to be fast (<50ms) so it doesn't slow down the session.
+# Typically completes in under 50ms; hard timeout of 2 seconds set in hooks.json.
 
 USAGE_DIR="$HOME/.moltbloat"
 USAGE_FILE="$USAGE_DIR/usage.jsonl"
@@ -30,10 +30,15 @@ case "$TOOL_NAME" in
     NAME=$(echo "$TOOL_INPUT" | grep -o '"subagent_type":"[^"]*"' | head -1 | cut -d'"' -f4)
     [ -z "$NAME" ] && NAME="general-purpose"
     ;;
+  mcp__plugin_*)
+    TYPE="mcp"
+    # Plugin MCP: mcp__plugin_oh-my-claudecode_t__tool -> oh-my-claudecode
+    NAME=$(echo "$TOOL_NAME" | sed 's/^mcp__plugin_//' | sed 's/_[^_]*__.*$//')
+    ;;
   mcp__*)
     TYPE="mcp"
-    # Extract server name: mcp__servername__toolname -> servername
-    NAME=$(echo "$TOOL_NAME" | cut -d'_' -f4)
+    # Direct MCP: mcp__figma-console__tool -> figma-console
+    NAME=$(echo "$TOOL_NAME" | sed 's/^mcp__//' | sed 's/__.*//')
     ;;
 esac
 

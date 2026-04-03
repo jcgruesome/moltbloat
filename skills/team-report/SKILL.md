@@ -111,7 +111,7 @@ Collect and aggregate moltbloat snapshots from multiple team members to identify
    - everything-claude-code@1.8.0
    - vercel-plugin@0.24.0
    - playwright@latest
-   - moltbloat@0.2.0
+   - moltbloat@latest
 
    ### Optional Plugins
    - claude-mem (for teams that want cross-session memory)

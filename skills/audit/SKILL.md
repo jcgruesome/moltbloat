@@ -52,7 +52,7 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    **2c. Skills**
    Count skills per plugin:
    ```bash
-   for dir in ~/.claude/plugins/marketplaces/*/skills/*/; do echo "$dir"; done 2>/dev/null
+   for dir in ~/.claude/plugins/cache/*/*/skills/*/; do echo "$dir"; done 2>/dev/null
    ```
    Also check for local skills:
    ```bash
@@ -221,9 +221,9 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    Floor at 0. Display with a visual indicator:
 
    ```
-   ## Health Score: 72/100
+   ## Health Score: 47/100
 
-   ████████████████████░░░░░░░░░░ 72/100
+   ██████████████░░░░░░░░░░░░░░░░ 47/100
 
    Breakdown:
      Base score:              100
@@ -233,7 +233,7 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
      Token cost > 5%:           -5
      No baseline snapshot:      -5
      ─────────────────────────
-     Final:                     47... wait, 72? Let me recalc
+     Final:                      47
    ```
 
    Use the actual deductions. The bar is `Math.round(score / 100 * 30)` filled blocks out of 30.

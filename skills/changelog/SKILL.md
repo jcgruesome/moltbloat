@@ -37,7 +37,7 @@ Cross-reference installed plugins and MCPs against a curated list of features th
    ```json
    [
      {
-       "plugin": "filesystem",
+       "name": "filesystem",
        "type": "mcp",
        "supersededBy": "native",
        "nativeFeature": "Read, Write, Edit, Glob, Grep tools",

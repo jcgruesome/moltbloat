@@ -19,7 +19,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash -c 'if [ -f ~/.moltbloat/baseline.json ]; then ts=$(python3 -c \"import json,sys; print(json.load(open(sys.argv[1]))[\\\"timestamp\\\"][:10])\" ~/.moltbloat/baseline.json 2>/dev/null); if [ -n \"$ts\" ]; then days=$(( ( $(date +%s) - $(date -j -f \"%Y-%m-%d\" \"$ts\" +%s 2>/dev/null || echo $(date +%s)) ) / 86400 )); if [ \"$days\" -gt 30 ]; then echo \"[moltbloat] Last ecosystem snapshot is ${days} days old. Run /moltbloat:snapshot to check for drift.\"; fi; fi; fi'",
+            "command": "python3 \"$CLAUDE_PLUGIN_ROOT/scripts/check-snapshot-age.py\"",
             "timeout": 5
           }
         ]

@@ -38,5 +38,5 @@ Claude Code ecosystem auditor plugin. Scans ~/.claude/ for bloat, redundancy, st
 - Read-only by default. Only `/moltbloat:clean` and `/moltbloat:profile apply` modify state.
 - Deterministic checks with concrete rules, not vague heuristics.
 - Reports are actionable — every finding has a specific fix action.
-- Usage tracking is silent and lightweight (<50ms per tool call).
+- Usage tracking is silent and lightweight (typically <50ms; hard timeout of 2s).
 - Dollar costs make token waste tangible.
