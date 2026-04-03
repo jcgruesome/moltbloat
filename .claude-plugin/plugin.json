@@ -1,0 +1,22 @@
+{
+  "name": "moltbloat",
+  "version": "0.3.0",
+  "description": "Audit your Claude Code ecosystem for bloat, redundancy, and token waste. Tracks usage, manages profiles, estimates costs.",
+  "author": {
+    "name": "James"
+  },
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "plugin",
+    "audit",
+    "bloat",
+    "cleanup",
+    "ecosystem",
+    "tokens",
+    "usage",
+    "profiles",
+    "cost"
+  ],
+  "skills": ["./skills/"]
+}

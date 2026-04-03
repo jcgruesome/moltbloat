@@ -1,0 +1,13 @@
+{
+  "name": "moltbloat",
+  "version": "0.3.0",
+  "description": "Audit your Claude Code ecosystem for bloat, redundancy, and token waste",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "plugin",
+    "audit",
+    "usage",
+    "profiles"
+  ]
+}
