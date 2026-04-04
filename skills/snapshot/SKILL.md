@@ -85,7 +85,7 @@ Capture the current state of the Claude Code ecosystem as a JSON baseline. On su
    ```json
    {
      "timestamp": "2026-04-03T15:30:00Z",
-     "version": "0.3.0",
+     "version": "<moltbloat version>",
      "plugins": {
        "total": 20,
        "enabled": 15,

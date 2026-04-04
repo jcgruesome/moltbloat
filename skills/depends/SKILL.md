@@ -90,38 +90,34 @@ Map the dependency graph of the Claude Code ecosystem. For any plugin, show exac
    For a single plugin query:
 
    ```
-   # Moltbloat Dependency Report: oh-my-claudecode
+   # Moltbloat Dependency Report: <plugin-name>
 
    ## Provides
 
    | Type | Count | Items |
    |------|-------|-------|
-   | Skills | 32 | autopilot, ralph, ultrawork, team, plan, ... |
-   | Agents | 19 | architect, code-reviewer, planner, ... |
-   | MCP servers | 1 | oh-my-claudecode tools (notepad, state, lsp, ...) |
-   | MCP tools | ~40 | notepad_write, state_read, lsp_diagnostics, ... |
-   | Hooks | 5 | PreToolUse, PostToolUse, SessionStart, ... |
-   | Commands | 0 | — |
-   | CLAUDE.md | 6.3 KB (~1,575 tokens) | Global instructions |
+   | Skills | <N> | <list top skill names> |
+   | Agents | <N> | <list agent names> |
+   | MCP servers | <N> | <list server names and tool categories> |
+   | MCP tools | ~<N> | <list tool name samples> |
+   | Hooks | <N> | <list hook types registered> |
+   | Commands | <N> | <list or "—"> |
+   | CLAUDE.md | <X> KB (~<Y> tokens) | <description> |
 
    ## Blast Radius if Removed
 
    **You would lose:**
-   - 32 skills including autopilot, ralph, ultrawork (core orchestration)
-   - 19 specialized agents (architect, code-reviewer, etc.)
-   - ~40 MCP tools (LSP, notepad, state management)
-   - All OMC hooks (HUD, session management, idle notifications)
+   <list each category with counts and notable items>
 
    **Other plugins affected:**
-   - None (no cross-dependencies detected)
+   <list any plugins that reference this one, or "None">
 
    **Overlaps with other installed plugins:**
-   - Agent `architect` also exists locally in ~/.claude/agents/
-   - Agent `code-reviewer` also exists locally in ~/.claude/agents/
+   <list detected skill/agent/MCP overlaps with other plugins>
 
    ## Token Cost
-   - ~1,575 tokens (CLAUDE.md) + ~14,000 tokens (MCP tools) + ~800 tokens (skill listings)
-   - **Total: ~16,375 tokens (1.6% of context window)**
+   <breakdown by CLAUDE.md + MCP tools + skill listings>
+   - **Total: ~<X> tokens (<Y>% of context window)**
    ```
 
    For a full graph:
@@ -131,21 +127,14 @@ Map the dependency graph of the Claude Code ecosystem. For any plugin, show exac
 
    | Plugin | Skills | Agents | MCPs | Tools | Hooks | Tokens |
    |--------|--------|--------|------|-------|-------|--------|
-   | oh-my-claudecode | 32 | 19 | 1 | ~40 | 5 | ~16,375 |
-   | everything-claude-code | 108 | 0 | 0 | 0 | 2 | ~4,200 |
-   | superpowers | 14 | 0 | 0 | 0 | 1 | ~2,800 |
-   | claude-mem | 5 | 0 | 1 | ~6 | 0 | ~3,100 |
-   | vercel-plugin | 40 | 0 | 1 | ~3 | 3 | ~8,500 |
-   | playwright | 0 | 0 | 1 | ~25 | 0 | ~8,750 |
-   | ... | ... | ... | ... | ... | ... | ... |
+   <one row per installed plugin with actual counts>
    | **TOTAL** | **X** | **X** | **X** | **X** | **X** | **~X** |
 
    ## Cross-Plugin Dependencies
-   - (list any detected references between plugins)
+   <list any detected references between plugins, or "None">
 
    ## Overlap Map
-   - Agents duplicated: architect (local + OMC), code-reviewer (local + OMC), ...
-   - MCP overlap: playwright (global config + plugin)
+   <list detected agent/skill/MCP overlaps across all plugins>
    ```
 
 5. **Done**

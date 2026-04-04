@@ -51,16 +51,13 @@ Scan all installed plugins for conflicts that cause unpredictable behavior: hook
 
    This doesn't always cause problems, but hooks that modify behavior (not just observe) can fight.
 
-   Build a conflict matrix:
+   Build a conflict matrix dynamically from the collected hook data:
    ```
    ## Hook Overlap Matrix
 
    | Hook Type | Matcher | Plugins | Conflict Risk |
    |-----------|---------|---------|---------------|
-   | PostToolUse | * | omc, vercel-plugin, moltbloat | LOW (all observe) |
-   | PreToolUse | Bash | omc, vercel-plugin | MEDIUM (both may inject) |
-   | UserPromptSubmit | * | omc, vercel-plugin | MEDIUM (both inject reminders) |
-   | SessionStart | * | omc, vercel-plugin | LOW (initialization) |
+   <one row per hook type+matcher combination where 2+ plugins overlap>
    ```
 
    Risk levels:
@@ -92,11 +89,9 @@ Scan all installed plugins for conflicts that cause unpredictable behavior: hook
 
    | Skill Name | Plugin A | Plugin B | Which Runs? |
    |------------|----------|----------|-------------|
-   | plan | oh-my-claudecode | superpowers | Depends on load order |
-   | code-review | everything-claude-code | code-review (plugin) | Ambiguous |
-   | tdd | everything-claude-code | superpowers | Depends on load order |
+   <one row per collision, populated from actual data>
 
-   **Impact**: When you invoke `/plan`, it's ambiguous which plugin's version runs.
+   **Impact**: When you invoke `/<skill>`, it's ambiguous which plugin's version runs.
    The plugin loaded last typically wins, but this is not guaranteed.
 
    **Fix options**:

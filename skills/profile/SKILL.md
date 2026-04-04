@@ -37,6 +37,8 @@ Manage named profiles that enable/disable specific plugins and rule sets. Switch
    - `/moltbloat:profile apply <name>` — switch to a profile
    - `/moltbloat:profile restore` — return to pre-switch state
    - `/moltbloat:profile auto` — suggest a profile based on usage data
+   - `/moltbloat:profile export <name>` — export a profile to a shareable JSON file
+   - `/moltbloat:profile import <path>` — import a profile from a file or URL
 
    If no subcommand, show `list`.
 
@@ -198,7 +200,78 @@ Manage named profiles that enable/disable specific plugins and rule sets. Switch
    Save as profile? (name it, or "skip")
    ```
 
-7. **Done**
+7. **For `export` — share a profile**
+
+   Export a profile as a portable JSON file that teammates can import:
+
+   ```bash
+   cat ~/.moltbloat/profiles/<name>.json 2>/dev/null
+   ```
+
+   If the profile doesn't exist, error and show available profiles.
+
+   The exported file is the profile JSON with an added `exported` metadata block:
+   ```json
+   {
+     "name": "<name>",
+     "created": "<timestamp>",
+     "exported": "<now>",
+     "exportedBy": "<git user.name or 'unknown'>",
+     "description": "<user description>",
+     "plugins": {
+       "<plugin-a>": "enabled",
+       "<plugin-b>": "disabled"
+     }
+   }
+   ```
+
+   Write to the current directory as `<name>.moltbloat-profile.json`:
+   ```bash
+   # Get git user for attribution
+   git config user.name 2>/dev/null || echo "unknown"
+   ```
+
+   Report:
+   ```
+   Exported profile "<name>" to ./<name>.moltbloat-profile.json
+   Share this file with teammates or commit it to your config repo.
+   They can import it with: /moltbloat:profile import <path>
+   ```
+
+8. **For `import` — load a shared profile**
+
+   The user provides a file path. Read and validate:
+   ```bash
+   cat <path> 2>/dev/null
+   ```
+
+   Validate the JSON has at minimum a `name` and `plugins` object. If invalid, error with what's wrong.
+
+   Show the user what the profile contains:
+   ```
+   Importing profile: "<name>"
+   Created by: <exportedBy> on <created>
+
+   This profile will:
+     Enable:  <list plugins marked enabled>
+     Disable: <list plugins marked disabled>
+     Skip:    <list plugins in profile but not installed locally>
+
+   Note: Plugins in the profile that aren't installed locally will be skipped.
+   You may need to install them first.
+
+   Save this profile? (yes / no)
+   ```
+
+   If confirmed, save to `~/.moltbloat/profiles/<name>.json` (stripping the `exported`/`exportedBy` metadata).
+
+   Report:
+   ```
+   Profile "<name>" imported and saved.
+   Apply it with: /moltbloat:profile apply <name>
+   ```
+
+9. **Done**
 
    Remind user to restart session for changes to take effect.
 

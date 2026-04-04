@@ -59,7 +59,40 @@ Analyze usage data collected by the moltbloat tracking hook to show what's actua
    grep -o '"date":"[^"]*"' ~/.moltbloat/usage.jsonl | sort | uniq -c | sort -k2
    ```
 
-3. **Cross-reference with installed inventory**
+3. **Estimate hook injection overhead**
+
+   Count how many tool invocations were tracked (each one triggered the PostToolUse hook). Calculate the hook overhead:
+
+   ```bash
+   total_invocations=$(wc -l < ~/.moltbloat/usage.jsonl)
+   unique_days=$(grep -o '"date":"[^"]*"' ~/.moltbloat/usage.jsonl | sort -u | wc -l)
+   ```
+
+   For each active plugin with hooks (from `installed_plugins.json`), read its `hooks/hooks.json` and count:
+   - How many PreToolUse hooks fire per tool call
+   - How many PostToolUse hooks fire per tool call
+   - How many UserPromptSubmit hooks fire per message
+
+   Estimate tokens per hook invocation based on hook type:
+   - **PreToolUse/PostToolUse with output**: ~100-500 tokens per fire (system-reminder injection)
+   - **PreToolUse/PostToolUse silent** (like moltbloat's tracker): ~0 tokens
+   - **UserPromptSubmit**: ~200-2,000 tokens per fire (skill injection, best-practice suggestions)
+   - **SessionStart**: one-time cost, ~500-5,000 tokens
+
+   ```
+   ## Hook Overhead
+
+   | Plugin | Hook Type | Fires Per | Est. Tokens/Fire | Daily Total |
+   |--------|-----------|-----------|-----------------|-------------|
+   <one row per active hook, with estimated daily token cost based on actual invocation counts>
+
+   **Estimated daily hook overhead**: ~<X> tokens
+   **As % of total token budget**: <Y>%
+   ```
+
+   Note: These are estimates — actual hook output varies. Hooks that inject `<system-reminder>` tags are the costly ones.
+
+4. **Cross-reference with installed inventory**
 
    Get the full list of installed skills, agents, and MCP servers:
 
@@ -91,24 +124,19 @@ Analyze usage data collected by the moltbloat tracking hook to show what's actua
    ### Skills (X used / Y installed)
    | Rank | Skill | Invocations | Source Plugin |
    |------|-------|-------------|--------------|
-   | 1 | autopilot | 47 | oh-my-claudecode |
-   | 2 | ralph | 31 | oh-my-claudecode |
-   | 3 | plan | 28 | superpowers |
+   | 1 | <name> | <count> | <plugin> |
    | ... | ... | ... | ... |
 
    ### Agents (X used / Y available)
    | Rank | Agent | Invocations |
    |------|-------|-------------|
-   | 1 | code-reviewer | 62 |
-   | 2 | Explore | 45 |
-   | 3 | planner | 19 |
+   | 1 | <name> | <count> |
    | ... | ... | ... |
 
    ### MCP Tools (X servers used / Y configured)
    | Rank | Server | Invocations |
    |------|--------|-------------|
-   | 1 | playwright | 34 |
-   | 2 | figma-console | 22 |
+   | 1 | <name> | <count> |
    | ... | ... | ... |
 
    ## What You NEVER Use
@@ -116,18 +144,13 @@ Analyze usage data collected by the moltbloat tracking hook to show what's actua
    ### Installed but zero invocations in <N> days
 
    **Skills (X never used):**
-   - kotlin-test, kotlin-review, kotlin-build (everything-claude-code)
-   - perl-patterns, perl-testing (everything-claude-code)
-   - cpp-build, cpp-review, cpp-test (everything-claude-code)
-   - ...
+   <list skills with 0 invocations, grouped by source plugin>
 
    **Agents (X never used):**
-   - chief-of-staff, database-reviewer, loop-operator
-   - ...
+   <list agents with 0 invocations>
 
    **MCP servers (X never called):**
-   - memory, filesystem, sequential-thinking
-   - ...
+   <list MCP servers with 0 invocations>
 
    ## The Bottom Line
 
