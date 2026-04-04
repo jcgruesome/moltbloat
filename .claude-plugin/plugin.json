@@ -18,5 +18,5 @@
     "profiles",
     "cost"
   ],
-  "skills": ["./skills/"]
+  "skills": "./skills/"
 }
