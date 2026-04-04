@@ -29,7 +29,7 @@ Display all available moltbloat commands with brief descriptions so the user kno
    |---------|-------------|
    | `/moltbloat:audit` | Full ecosystem scan — finds redundancy, collisions, staleness, and scores health (0-100) |
    | `/moltbloat:token-budget` | Context window cost analysis — shows what each plugin costs in tokens and dollars |
-   | `/moltbloat:usage` | What you actually use vs what's installed (requires tracking data) |
+   | `/moltbloat:usage` | What you actually use vs what's installed, hook overhead, data compaction |
 
    ### Investigate
    | Command | Description |
@@ -43,7 +43,7 @@ Display all available moltbloat commands with brief descriptions so the user kno
    | Command | Description |
    |---------|-------------|
    | `/moltbloat:clean` | Interactive cleanup — review findings and selectively remove bloat |
-   | `/moltbloat:profile` | Switch ecosystem configs — lean, full, frontend, backend, or custom profiles |
+   | `/moltbloat:profile` | Switch ecosystem configs, create/export/import profiles for team sharing |
    | `/moltbloat:snapshot` | Save current ecosystem as baseline for future drift detection |
 
    ### Team

@@ -35,11 +35,13 @@ claude plugin install moltbloat
 
 ### Management — control your ecosystem
 ```
-/moltbloat:profile list       # See available profiles
-/moltbloat:profile apply lean # Switch to minimal config
-/moltbloat:profile auto       # Auto-generate profile from usage data
-/moltbloat:snapshot           # Save baseline, detect drift
-/moltbloat:team-report        # Aggregate findings across team
+/moltbloat:profile list         # See available profiles
+/moltbloat:profile apply lean   # Switch to minimal config
+/moltbloat:profile auto         # Auto-generate profile from usage data
+/moltbloat:profile export <name> # Share a profile as portable JSON
+/moltbloat:profile import <path> # Import a shared profile
+/moltbloat:snapshot             # Save baseline, detect drift
+/moltbloat:team-report          # Aggregate findings across team
 ```
 
 ## What makes this different

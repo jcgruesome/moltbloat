@@ -101,13 +101,12 @@ Manage named profiles that enable/disable specific plugins and rule sets. Switch
    ```json
    {
      "name": "<name>",
-     "created": "2026-04-03T15:00:00Z",
+     "created": "<timestamp>",
      "description": "<user description>",
      "plugins": {
-       "oh-my-claudecode": "enabled",
-       "everything-claude-code": "disabled",
-       "vercel-plugin": "enabled",
-       "playwright": "enabled"
+       "<plugin-a>": "enabled",
+       "<plugin-b>": "disabled",
+       "<plugin-c>": "enabled"
      }
    }
    ```

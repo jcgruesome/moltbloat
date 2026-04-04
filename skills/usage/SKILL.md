@@ -92,7 +92,7 @@ Analyze usage data collected by the moltbloat tracking hook to show what's actua
 
    Note: These are estimates — actual hook output varies. Hooks that inject `<system-reminder>` tags are the costly ones.
 
-4. **Cross-reference with installed inventory**
+5. **Cross-reference with installed inventory**
 
    Get the full list of installed skills, agents, and MCP servers:
 
@@ -110,7 +110,7 @@ Analyze usage data collected by the moltbloat tracking hook to show what's actua
 
    Compare: which installed items have ZERO usage entries?
 
-4. **Generate the report**
+6. **Generate the report**
 
    ```
    # Moltbloat Usage Report
@@ -168,7 +168,7 @@ Analyze usage data collected by the moltbloat tracking hook to show what's actua
    - Run `/moltbloat:clean` to remove confirmed dead weight
    ```
 
-5. **Compact old usage data**
+7. **Compact old usage data**
 
    Check if the usage file has grown large enough to benefit from compaction:
    ```bash
@@ -183,14 +183,14 @@ Analyze usage data collected by the moltbloat tracking hook to show what's actua
 
    If user confirms:
 
-   **5a.** Read all entries, split into recent (last 30 days) and old.
+   **7a.** Read all entries, split into recent (last 30 days) and old.
 
-   **5b.** Aggregate old entries into daily summaries:
+   **7b.** Aggregate old entries into daily summaries:
    ```json
-   {"date":"2026-03-01","type":"summary","skills":{"plan":12,"audit":3},"agents":{"code-reviewer":8},"mcps":{"playwright":5},"tools":{"Read":45,"Edit":22},"total":95}
+   {"date":"<date>","type":"summary","skills":{"<name>":<count>},"agents":{"<name>":<count>},"mcps":{"<name>":<count>},"tools":{"<name>":<count>},"total":<count>}
    ```
 
-   **5c.** Write compacted file:
+   **7c.** Write compacted file:
    ```bash
    # Back up first
    cp ~/.moltbloat/usage.jsonl ~/.moltbloat/usage.jsonl.bak
@@ -200,7 +200,7 @@ Analyze usage data collected by the moltbloat tracking hook to show what's actua
    mv ~/.moltbloat/usage.jsonl.new ~/.moltbloat/usage.jsonl
    ```
 
-   **5d.** Report:
+   **7d.** Report:
    ```
    Compacted: <old_count> raw entries → <summary_count> daily summaries
    Kept: <recent_count> recent entries (last 30 days)
@@ -210,7 +210,7 @@ Analyze usage data collected by the moltbloat tracking hook to show what's actua
 
    If user declines or <5,000 lines, skip silently.
 
-6. **Done**
+8. **Done**
 
    The data keeps accumulating — run again later for updated insights.
 

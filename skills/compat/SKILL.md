@@ -96,7 +96,7 @@ Scan all installed plugins for conflicts that cause unpredictable behavior: hook
 
    **Fix options**:
    - Disable one of the conflicting plugins
-   - Use fully-qualified names: `/oh-my-claudecode:plan` vs `/superpowers:plan`
+   - Use fully-qualified names: `/plugin-a:skill` vs `/plugin-b:skill`
    ```
 
 4. **Detect MCP tool collisions**

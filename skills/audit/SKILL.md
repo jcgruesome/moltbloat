@@ -129,12 +129,17 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    Check `~/.claude/projects/` for directories that don't correspond to any existing project path:
    ```bash
    for dir in ~/.claude/projects/*/; do
-     # Decode the directory name back to a path
-     path=$(basename "$dir" | sed 's/-/\//g')
-     # Check if original path exists
+     dirname=$(basename "$dir")
+     # Claude Code encodes paths by replacing / with -
+     # Reconstruct: leading - becomes /, remaining - become /
+     path=$(echo "$dirname" | sed 's/^-/\//' | sed 's/-/\//g')
+     if [ ! -d "$path" ]; then
+       size=$(du -sh "$dir" 2>/dev/null | cut -f1)
+       echo "ORPHAN: $dirname ($size)"
+     fi
    done
    ```
-   Flag orphaned project configs.
+   Note: The `-` to `/` conversion is lossy — directory names containing hyphens will produce false paths. To reduce false positives, only flag directories where the reconstructed path clearly doesn't exist AND the directory is >1 MB (meaningful size). Flag as LOW severity.
 
    ### Check 9: Large Caches
    Flag any single cache directory over 50MB. Flag total plugin cache over 500MB.

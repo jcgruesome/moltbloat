@@ -139,9 +139,7 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
    | Rules (typescript) | X | X | X% | Language-specific |
    | Rules (python) | X | X | X% | Language-specific |
    | ... | ... | ... | ... | ... |
-   | Plugin: oh-my-claudecode | X | X | X% | Instructions + AGENTS.md |
-   | Plugin: everything-claude-code | X | X | X% | Instructions |
-   | Plugin: superpowers | X | X | X% | Instructions |
+   <one row per installed plugin with actual byte/token measurements>
    | ... | ... | ... | ... | ... |
    | MCP tools (~N tools) | - | X | X% | Tool schemas in context |
    | Skill listings (~N skills) | - | X | X% | Skill menu |

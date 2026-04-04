@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PLUGIN_ROOT/scripts/track-usage.sh\"",
+            "command": "bash '${CLAUDE_PLUGIN_ROOT}/scripts/track-usage.sh'",
             "timeout": 2
           }
         ]
@@ -19,7 +19,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PLUGIN_ROOT/scripts/check-snapshot-age.py\"",
+            "command": "python3 '${CLAUDE_PLUGIN_ROOT}/scripts/check-snapshot-age.py'",
             "timeout": 5
           }
         ]

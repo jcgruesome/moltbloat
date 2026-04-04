@@ -139,8 +139,8 @@ Capture the current state of the Claude Code ecosystem as a JSON baseline. On su
    | Token cost (est.) | 34,000 | 37,325 | +3,325 |
 
    ## New Since Last Snapshot
-   - Plugin: vercel-plugin@0.24.0 (enabled)
-   - Plugin: moltbloat@0.1.0 (enabled)
+   <list plugins in current but not in baseline>
+
 
    ## Removed Since Last Snapshot
    - (none)

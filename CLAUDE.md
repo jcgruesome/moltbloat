@@ -31,8 +31,10 @@ Run `/moltbloat:help` for the full command reference.
 
 ## Data Files
 
-- `~/.moltbloat/usage.jsonl` — Usage tracking data (created automatically)
+- `~/.moltbloat/usage.jsonl` — Usage tracking data (created automatically by PostToolUse hook)
+- `~/.moltbloat/usage.jsonl.bak` — Backup created before usage compaction
 - `~/.moltbloat/baseline.json` — Ecosystem snapshot (created by `/moltbloat:snapshot`)
+- `~/.moltbloat/history.log` — One-line snapshot summaries over time (appended by `/moltbloat:snapshot`)
 - `~/.moltbloat/profiles/*.json` — Saved profiles (created by `/moltbloat:profile`)
 
 ## Design Principles

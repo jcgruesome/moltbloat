@@ -57,16 +57,11 @@ Collect and aggregate moltbloat snapshots from multiple team members to identify
    For each plugin, count how many team members have it installed:
 
    ```
-   # Team Plugin Matrix (5 members)
+   # Team Plugin Matrix (<N> members)
 
-   | Plugin | Alice | Bob | Carol | Dave | Eve | Coverage |
-   |--------|-------|-----|-------|------|-----|----------|
-   | oh-my-claudecode | Y | Y | Y | Y | Y | 100% |
-   | everything-claude-code | Y | Y | Y | Y | N | 80% |
-   | vercel-plugin | Y | Y | N | Y | Y | 80% |
-   | claude-mem | Y | N | N | N | N | 20% |
-   | playwright | Y | Y | Y | Y | Y | 100% |
-   | filesystem (MCP) | Y | Y | Y | Y | Y | 100% |
+   | Plugin | <Member 1> | <Member 2> | ... | Coverage |
+   |--------|------------|------------|-----|----------|
+   <one row per plugin found across any member's snapshot>
    ```
 
 4. **Identify standardization opportunities**
@@ -75,28 +70,19 @@ Collect and aggregate moltbloat snapshots from multiple team members to identify
    ## Recommendations
 
    ### Adopt Team-Wide (80%+ already use)
-   - oh-my-claudecode — all 5 members
-   - playwright — all 5 members
-   - everything-claude-code — 4/5 members (Eve should install)
+   <list plugins with 80%+ coverage — suggest remaining members install>
 
-   ### Remove Team-Wide (flagged as redundant by majority)
-   - filesystem MCP — all 5 have it, all 5 don't need it (native tools)
-   - memory MCP — 3/5 have it alongside claude-mem
+   ### Flagged by Multiple Members
+   <list any plugins/MCPs that appear in multiple members' audit findings>
 
    ### Inconsistencies
-   - Bob has vercel-plugin 0.22.0, team standard is 0.24.0
-   - Carol missing vercel-plugin entirely
-   - Only Alice has claude-mem — team should decide: adopt or skip
+   <list version mismatches, plugins some members have and others don't>
 
    ### Token Budget Comparison
    | Member | Est. Tokens | vs. Average |
    |--------|-------------|-------------|
-   | Alice | 42,000 | +15% above avg |
-   | Bob | 35,000 | -4% |
-   | Carol | 28,000 | -23% (fewest plugins) |
-   | Dave | 38,000 | +4% |
-   | Eve | 40,000 | +10% |
-   | **Average** | **36,600** | — |
+   <one row per member with their token estimate and delta from average>
+   | **Average** | **<X>** | — |
    ```
 
 5. **Generate recommended baseline**
