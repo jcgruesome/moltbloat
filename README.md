@@ -6,7 +6,7 @@ A Claude Code plugin that audits your ecosystem for bloat, redundancy, and token
 
 ```bash
 # From GitHub marketplace
-claude plugin marketplace add <repo-url>
+claude plugin marketplace add https://github.com/jcgruesome/moltbloat
 claude plugin install moltbloat
 
 # From local path
