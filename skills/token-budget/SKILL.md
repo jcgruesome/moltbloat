@@ -175,11 +175,51 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
 
    **Note**: This is the FIXED overhead cost — the ecosystem tax you pay on every message regardless of what you're doing. Your actual message content and tool results are on top of this.
 
+   ## Context Pressure
+
+   Calculate what percentage of the context window is consumed by ecosystem overhead alone (before any user messages, tool results, or conversation history):
+
+   ```
+   Ecosystem overhead: ~<X> tokens (<Y>% of 1M context window)
+   Remaining for work: ~<Z> tokens
+   ```
+
+   If overhead exceeds 3% (~30K tokens):
+   > **Context pressure: ELEVATED** — Your ecosystem consumes <Y>% of the context
+   > window before you start working. For long sessions, you'll need to `/compact`
+   > sooner. Consider `/moltbloat:profile lean` for extended work sessions.
+
+   If overhead exceeds 5% (~50K tokens):
+   > **Context pressure: HIGH** — At <Y>% ecosystem overhead, you're losing
+   > significant working context. This means more frequent `/compact` cycles and
+   > degraded performance in the last 20% of your context window. Strongly
+   > recommend reviewing the top consumers above.
+
+   ## Effort Setting Impact
+
+   Show how `/effort` interacts with ecosystem overhead:
+
+   ```
+   Your ecosystem costs ~<X> tokens/message regardless of effort level.
+
+   | Effort | Typical response | Ecosystem as % of message |
+   |--------|-----------------|--------------------------|
+   | low    | ~2K tokens      | <X / (X+2000) * 100>%   |
+   | medium | ~8K tokens      | <X / (X+8000) * 100>%   |
+   | high   | ~20K tokens     | <X / (X+20000) * 100>%  |
+   ```
+
+   If ecosystem overhead is >30K tokens:
+   > **Tip**: With <X> tokens of ecosystem overhead, `/effort low` still costs
+   > ~<X+2000> tokens per message — the ecosystem is the dominant cost, not
+   > your response. Use `/moltbloat:profile lean` to make `/effort low` truly lean.
+
    ## Recommendations
    - Items consuming >5% of context with low/no usage should be reviewed
    - Consider disabling language rules you don't actively use
    - MCP tools are the hidden cost — each registered tool consumes ~350 tokens
    - Use `/moltbloat:profile lean` to cut costs for simple tasks
+   - For long sessions, `/compact` at ~60% context to maintain quality
    - Run `/moltbloat:usage` to see which costly components you actually use
    - Run `/moltbloat:audit` for full redundancy analysis
    ```
