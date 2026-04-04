@@ -145,8 +145,50 @@ Analyze usage data collected by the moltbloat tracking hook to show what's actua
    - Run `/moltbloat:clean` to remove confirmed dead weight
    ```
 
-5. **Done**
+5. **Compact old usage data**
 
-   Read-only. The data keeps accumulating — run again later for updated insights.
+   Check if the usage file has grown large enough to benefit from compaction:
+   ```bash
+   wc -l < ~/.moltbloat/usage.jsonl 2>/dev/null
+   ```
+
+   If >5,000 lines, offer to compact:
+
+   > Usage log has <N> entries. Compact old data to keep it fast?
+   > This aggregates entries older than 30 days into daily summaries and
+   > removes the raw lines. Recent data (last 30 days) stays untouched.
+
+   If user confirms:
+
+   **5a.** Read all entries, split into recent (last 30 days) and old.
+
+   **5b.** Aggregate old entries into daily summaries:
+   ```json
+   {"date":"2026-03-01","type":"summary","skills":{"plan":12,"audit":3},"agents":{"code-reviewer":8},"mcps":{"playwright":5},"tools":{"Read":45,"Edit":22},"total":95}
+   ```
+
+   **5c.** Write compacted file:
+   ```bash
+   # Back up first
+   cp ~/.moltbloat/usage.jsonl ~/.moltbloat/usage.jsonl.bak
+
+   # Write: old summaries + recent raw entries
+   cat <summaries> <recent_entries> > ~/.moltbloat/usage.jsonl.new
+   mv ~/.moltbloat/usage.jsonl.new ~/.moltbloat/usage.jsonl
+   ```
+
+   **5d.** Report:
+   ```
+   Compacted: <old_count> raw entries → <summary_count> daily summaries
+   Kept: <recent_count> recent entries (last 30 days)
+   File size: <old_size> → <new_size>
+   Backup: ~/.moltbloat/usage.jsonl.bak
+   ```
+
+   If user declines or <5,000 lines, skip silently.
+
+6. **Done**
+
+   The data keeps accumulating — run again later for updated insights.
 
 </Steps>
