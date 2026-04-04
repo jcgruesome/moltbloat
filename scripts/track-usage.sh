@@ -21,13 +21,13 @@ NAME="$TOOL_NAME"
 case "$TOOL_NAME" in
   Skill)
     TYPE="skill"
-    # Extract skill name from input
-    NAME=$(echo "$TOOL_INPUT" | grep -o '"skill":"[^"]*"' | head -1 | cut -d'"' -f4)
+    # Extract skill name from input (handle optional whitespace in JSON)
+    NAME=$(echo "$TOOL_INPUT" | grep -oE '"skill"\s*:\s*"[^"]*"' | head -1 | sed 's/.*:.*"\([^"]*\)"/\1/')
     [ -z "$NAME" ] && NAME="unknown-skill"
     ;;
   Agent)
     TYPE="agent"
-    NAME=$(echo "$TOOL_INPUT" | grep -o '"subagent_type":"[^"]*"' | head -1 | cut -d'"' -f4)
+    NAME=$(echo "$TOOL_INPUT" | grep -oE '"subagent_type"\s*:\s*"[^"]*"' | head -1 | sed 's/.*:.*"\([^"]*\)"/\1/')
     [ -z "$NAME" ] && NAME="general-purpose"
     ;;
   mcp__plugin_*)
