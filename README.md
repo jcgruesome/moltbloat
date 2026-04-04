@@ -18,6 +18,7 @@ claude plugin install moltbloat
 
 ### Core — audit, understand costs, clean up
 ```
+/moltbloat:help           # Show all available commands
 /moltbloat:audit          # Full scan with health score (0-100)
 /moltbloat:token-budget   # Context cost breakdown + dollar estimates
 /moltbloat:clean          # Interactive cleanup with confirmation
@@ -25,7 +26,7 @@ claude plugin install moltbloat
 
 ### Intelligence — understand your ecosystem
 ```
-/moltbloat:changelog      # Check for plugins superseded by native features
+/moltbloat:changelog      # Diff ecosystem against last snapshot
 /moltbloat:depends        # Dependency graph + blast radius
 /moltbloat:why <plugin>   # Quick "should I keep this?" card
 /moltbloat:compat         # Detect hook conflicts + skill shadowing
@@ -58,12 +59,12 @@ Token-budget shows the actual dollar cost of your ecosystem overhead:
 ### Compatibility detection
 Finds plugin conflicts before they cause mysterious behavior: hook collisions, skill name shadowing, duplicate MCP tools.
 
-### Release awareness
-`data/superseded.json` tracks plugins made redundant by native Claude Code features. Community-editable — submit PRs when new releases make plugins unnecessary.
+### Fully dynamic
+All checks are structural — no hardcoded plugin names or curated opinion lists. The audit detects redundancy by analyzing what's actually installed and where things overlap, not by maintaining a database of "X replaces Y." The ecosystem evolves fast; moltbloat keeps up automatically.
 
 ## What it checks
 
-- **Plugins**: disabled, superseded, zero-skill installs
+- **Plugins**: disabled, zero-skill, stale cache versions
 - **MCP servers**: duplicates of native features or other plugins
 - **Skills**: cross-plugin overlap and name collisions
 - **Agents**: local vs plugin-provided duplicates

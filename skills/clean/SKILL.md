@@ -43,101 +43,105 @@ Act on findings from `/moltbloat:audit`. Walk through each finding interactively
 
    Found X issues to review. I'll walk through each one — you decide what to fix.
 
+   ## CRITICAL (fix these)
+   1. [Skills] 30+ skill name collisions between <plugin-a> and <plugin-b>
+   2. ...
+
    ## HIGH (act on these)
-   1. [Plugin] ralph-loop superseded by OMC native ralph
-   2. [Plugin] Old vercel superseded by vercel-plugin
-   3. ...
+   3. [Agents] 25 local agents duplicate <plugin> agents
+   4. ...
 
    ## MEDIUM (worth considering)
-   4. [MCP] filesystem server redundant with native tools
-   5. [MCP] memory server redundant with claude-mem
-   6. ...
+   5. [Plugin] <name> — 0 skills, 0 MCP servers, 0 agents
+   6. [Cache] Stale versions consuming X MB
+   7. ...
 
    ## LOW (optional cleanup)
-   7. [Plugin] linear — disabled, no skills, likely unused
-   8. [Plugin] slack — disabled, no skills
-   9. ...
+   8. [Plugin] <name> — disabled for 60+ days
+   9. [Project] Orphaned config — X MB
+   10. ...
 
-   Reply with numbers to fix (e.g., "1, 2, 4") or "all high", "all", or "skip".
+   Reply with numbers to fix (e.g., "1, 3, 5") or "all high", "all", or "skip".
    ```
 
 3. **Process each selected finding**
 
    For each finding the user selects, present the specific action and ask for confirmation.
 
-   ### Plugin removal
+   For each finding type, use the appropriate template. Replace all placeholders with actual values from the audit.
+
+   ### Skill collision fix
    ```
-   ## Finding 1: ralph-loop plugin superseded by OMC
+   ## Finding N: <count> skill collisions between <plugin-a> and <plugin-b>
 
-   **What**: The `ralph-loop` plugin (v1.0.0) provides an iterative loop feature.
-   **Why remove**: oh-my-claudecode includes a native `ralph` skill that is more
-   integrated and actively maintained. Having both creates ambiguity about which runs.
-   **Action**: Uninstall ralph-loop plugin
-   **Command**: `claude plugin remove ralph-loop`
-   **Risk**: None — OMC's ralph is the canonical implementation
+   **What**: Both plugins provide skills with the same names: <list names>
+   **Why fix**: Only one version runs — you may not be getting the one you expect.
+   **Action**: Uninstall whichever plugin provides less unique value. Run
+   `/moltbloat:why <plugin>` on each to compare.
+   **Risk**: Losing skills unique to the removed plugin
 
-   Proceed? (yes/no/skip)
-   ```
-
-   If user confirms, run the uninstall command. If it fails, report the error and move on.
-
-   ### MCP server removal
-   ```
-   ## Finding 4: filesystem MCP redundant with native tools
-
-   **What**: MCP server `filesystem` (@modelcontextprotocol/server-filesystem)
-   registered in ~/.claude/mcp-configs/mcp-servers.json
-   **Why remove**: Claude Code has native Read, Write, Edit, Glob, and Grep tools
-   that are faster and better integrated. The filesystem MCP adds ~350 tokens of
-   tool definitions for no additional capability.
-   **Action**: Remove `filesystem` entry from mcp-servers.json
-   **Risk**: None — native tools are superior
-
-   Proceed? (yes/no/skip)
+   Which plugin to remove? (<plugin-a> / <plugin-b> / skip)
    ```
 
-   If user confirms:
-   1. Read the current mcp-servers.json
-   2. Back up to mcp-servers.json.bak
-   3. Remove the specific entry
-   4. Write the updated file
-   5. Confirm the change
-
-   ### Disabled plugin cleanup
-   ```
-   ## Finding 7: linear plugin — disabled, unused
-
-   **What**: `linear` plugin is installed but disabled. No skills, MCP only.
-   **Last updated**: <date>
-   **Action**: Uninstall to reduce clutter
-   **Risk**: If you need Linear integration later, you can reinstall
-
-   Proceed? (yes/no/skip)
-   ```
+   If user chooses, run the uninstall command. If it fails, report the error and move on.
 
    ### Agent dedup
    ```
-   ## Finding N: Duplicate agent — architect.md
+   ## Finding N: Duplicate agent — <name>.md
 
-   **What**: `architect.md` exists in both ~/.claude/agents/ (local) and
-   oh-my-claudecode plugin (plugin-provided).
-   **Comparison**: Local version is a generic template. OMC version has model
-   routing, tool restrictions, and investigation protocols.
-   **Action**: Remove local ~/.claude/agents/architect.md (OMC version is superior)
-   **Risk**: Low — OMC agent is more capable. Remove only if you haven't customized the local version.
+   **What**: `<name>.md` exists in both ~/.claude/agents/ (local) and
+   <plugin> (plugin-provided).
+   **Comparison**: <read first 5 lines of each and summarize differences>
+   **Action**: Remove local ~/.claude/agents/<name>.md
+   **Risk**: Low if versions are identical. If the local version has custom
+   modifications, those will be lost.
 
    Proceed? (yes/no/skip)
    ```
 
-   Before removing a local agent, read both versions and confirm the plugin version is indeed more capable. If the local version has custom modifications, warn the user.
+   Before removing a local agent, read both versions. If the local version has custom modifications, warn the user and recommend keeping it.
+
+   ### Zero-skill plugin removal
+   ```
+   ## Finding N: <plugin> — no skills, no MCP, no agents
+
+   **What**: Plugin is installed but provides nothing detectable.
+   **Action**: Uninstall plugin
+   **Command**: `claude plugin remove <plugin>`
+   **Risk**: Plugin may provide hooks or rules not detected by this scan
+
+   Proceed? (yes/no/skip)
+   ```
+
+   ### Disabled plugin cleanup
+   ```
+   ## Finding N: <plugin> — disabled for <X> days
+
+   **What**: Plugin is installed but disabled. Last updated <date>.
+   **Action**: Uninstall to reduce clutter
+   **Risk**: If you need it later, you can reinstall
+
+   Proceed? (yes/no/skip)
+   ```
 
    ### Stale cache cleanup
    ```
    ## Finding N: Old plugin cache — X MB recoverable
 
-   **What**: Plugin cache directories for old versions consuming X MB
-   **Action**: Remove old version caches (keeps current versions)
+   **What**: <count> old version cache directories consuming X MB total
+   **Action**: Remove old version caches (keeps current active versions)
    **Risk**: Cannot roll back to previous plugin versions after removal
+
+   Proceed? (yes/no/skip)
+   ```
+
+   ### Orphaned project config
+   ```
+   ## Finding N: Orphaned project config — X MB
+
+   **What**: Project config at <path> doesn't map to an existing project directory
+   **Action**: Delete the orphaned config directory
+   **Risk**: Loss of project-specific memory and settings for a project that no longer exists
 
    Proceed? (yes/no/skip)
    ```
@@ -150,12 +154,11 @@ Act on findings from `/moltbloat:audit`. Walk through each finding interactively
    # Cleanup Complete
 
    ## Actions Taken
-   - Uninstalled ralph-loop plugin
-   - Removed filesystem MCP from mcp-servers.json
+   - <list each action performed with specific names>
    - ...
 
    ## Skipped
-   - linear plugin (user chose to keep)
+   - <list each finding the user chose to skip>
    - ...
 
    ## Disk Space Recovered

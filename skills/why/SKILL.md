@@ -85,13 +85,7 @@ Fast, focused answer to "what does plugin X do and should I keep it?" Shows what
    done
    ```
 
-5. **Check superseded rules**
-
-   ```bash
-   cat ~/.claude/plugins/cache/moltbloat/moltbloat/*/data/superseded.json 2>/dev/null | grep -i "<plugin_name>"
-   ```
-
-6. **Output the card**
+5. **Output the card**
 
    Format as a compact card:
 
@@ -112,21 +106,20 @@ Fast, focused answer to "what does plugin X do and should I keep it?" Shows what
    ~X tokens per session (Y% of context window)
 
    ## Overlaps
-   - Skill "foo" also in plugin-bar
-   - Agent "architect" also in ~/.claude/agents/
+   - Skill "<name>" also provided by <other-plugin>
+   - Agent "<name>" also exists in ~/.claude/agents/
    - (or "No overlaps detected")
 
-   ## Superseded?
-   - (yes/no + details from superseded.json if applicable)
-
    ## Verdict
-   **KEEP** — core orchestration, no native replacement
+   **KEEP** — unique functionality, no overlaps
    (or)
-   **CONSIDER REMOVING** — superseded by native X, overlaps with Y
+   **CONSIDER REMOVING** — X skill collisions with <other-plugin>, Y overlapping agents
    (or)
    **REMOVE** — disabled, zero skills, no unique functionality
    ```
 
-7. **Done**
+   Base the verdict purely on structural evidence collected in steps 3-4 (skill/agent/MCP overlaps, zero-skill status, enabled/disabled). Do not reference any external opinion list.
+
+6. **Done**
 
 </Steps>
