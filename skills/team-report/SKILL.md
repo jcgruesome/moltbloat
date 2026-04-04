@@ -101,32 +101,25 @@ Collect and aggregate moltbloat snapshots from multiple team members to identify
 
 5. **Generate recommended baseline**
 
-   Based on the analysis, suggest a standard plugin set:
+   Based on the analysis, suggest a standard plugin set. All recommendations are derived from the team data — no hardcoded plugin lists:
 
    ```
    ## Recommended Team Baseline
 
-   ### Required Plugins
-   - oh-my-claudecode@4.9.1
-   - everything-claude-code@1.8.0
-   - vercel-plugin@0.24.0
-   - playwright@latest
-   - moltbloat@latest
+   ### Required (100% team adoption)
+   <list plugins installed by all team members>
 
-   ### Optional Plugins
-   - claude-mem (for teams that want cross-session memory)
-   - superpowers (for methodology enforcement)
+   ### Recommended (80%+ adoption — stragglers should install)
+   <list plugins used by most but not all>
 
-   ### Remove Everywhere
-   - filesystem MCP
-   - memory MCP
-   - sequential-thinking MCP
-   - ralph-loop plugin
+   ### Optional (below 80% — team should decide)
+   <list plugins with mixed adoption>
+
+   ### Flagged by Audit (team members report redundancy)
+   <list any plugins/MCPs that multiple members' audits flagged as issues>
 
    ### Standard Rules
-   - common/ (required)
-   - typescript/ (if using TS)
-   - python/ (if using Python)
+   <list rule directories present across majority of members>
 
    To generate an install script for new members:
    Save this as `team-setup.sh` in your config repo.

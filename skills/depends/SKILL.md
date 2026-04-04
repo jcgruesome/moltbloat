@@ -78,9 +78,11 @@ Map the dependency graph of the Claude Code ecosystem. For any plugin, show exac
 
 3. **Detect cross-plugin dependencies**
 
-   Check if any plugin's skills or hooks reference another plugin by name. Simple grep:
+   Build a grep pattern dynamically from all installed plugin names, then check if any plugin's skills or hooks reference another plugin:
    ```bash
-   grep -r "oh-my-claudecode\|everything-claude-code\|superpowers\|claude-mem" "$PLUGIN_DIR/skills/" 2>/dev/null
+   # Build pattern from all installed plugin names (excluding the current one)
+   pattern=$(cat ~/.claude/plugins/installed_plugins.json 2>/dev/null | grep -oE '"[^"]+@[^"]+' | sed 's/^"//' | cut -d'@' -f1 | grep -v "<current_plugin>" | paste -sd'|' -)
+   grep -rE "$pattern" "$PLUGIN_DIR/skills/" "$PLUGIN_DIR/hooks/" 2>/dev/null
    ```
 
 4. **Build the dependency table**
