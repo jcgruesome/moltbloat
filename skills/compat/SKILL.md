@@ -23,12 +23,18 @@ Scan all installed plugins for conflicts that cause unpredictable behavior: hook
 
 1. **Collect all plugin hook registrations**
 
-   For each installed plugin, read its hooks:
+   First, get the active install paths from the plugin registry (to avoid scanning stale cache versions):
    ```bash
-   for plugin_dir in ~/.claude/plugins/cache/*/*/; do
+   cat ~/.claude/plugins/installed_plugins.json 2>/dev/null
+   ```
+   Extract the `installPath` for each plugin entry. Only scan those directories.
+
+   For each active plugin directory, read its hooks:
+   ```bash
+   for plugin_dir in <active install paths>; do
      hooks_file="$plugin_dir/hooks/hooks.json"
      if [ -f "$hooks_file" ]; then
-       plugin=$(echo "$plugin_dir" | sed 's|.*/cache/[^/]*/\([^/]*\)/.*|\1|')
+       plugin=$(basename "$(dirname "$plugin_dir")")
        echo "=== $plugin ==="
        cat "$hooks_file"
      fi
@@ -64,10 +70,10 @@ Scan all installed plugins for conflicts that cause unpredictable behavior: hook
 
 3. **Detect skill name shadowing**
 
-   Build a map of all skill names to their source plugin:
+   Build a map of all skill names to their source plugin. Use only active install paths from `installed_plugins.json` (not stale cache versions):
    ```bash
-   for plugin_dir in ~/.claude/plugins/cache/*/*/; do
-     plugin=$(echo "$plugin_dir" | sed 's|.*/cache/[^/]*/\([^/]*\)/.*|\1|')
+   for plugin_dir in <active install paths>; do
+     plugin=$(basename "$(dirname "$plugin_dir")")
      find "$plugin_dir/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | while read skill_dir; do
        skill=$(basename "$skill_dir")
        echo "$skill|$plugin"
@@ -100,12 +106,15 @@ Scan all installed plugins for conflicts that cause unpredictable behavior: hook
 
 4. **Detect MCP tool collisions**
 
-   Collect all MCP server names and their tools:
+   Collect all MCP server names and their tools. Only check active plugin install paths (from `installed_plugins.json`), not stale cache versions:
    ```bash
-   for mcp_file in $(find ~/.claude/plugins/cache -name ".mcp.json" -type f 2>/dev/null); do
-     plugin=$(echo "$mcp_file" | sed 's|.*/cache/[^/]*/\([^/]*\)/.*|\1|')
-     echo "=== $plugin ==="
-     cat "$mcp_file"
+   for plugin_dir in <active install paths>; do
+     mcp_file="$plugin_dir/.mcp.json"
+     if [ -f "$mcp_file" ]; then
+       plugin=$(basename "$(dirname "$plugin_dir")")
+       echo "=== $plugin ==="
+       cat "$mcp_file"
+     fi
    done
    ```
 
@@ -131,23 +140,19 @@ Scan all installed plugins for conflicts that cause unpredictable behavior: hook
 
 6. **Context injection analysis**
 
-   Count how many plugins inject content on UserPromptSubmit and PreToolUse — these fire frequently and compound:
+   Count how many plugins inject content on UserPromptSubmit and PreToolUse — these fire frequently and compound. List each plugin that has hooks on these events, with estimated token cost per invocation:
 
    ```
    ## Context Injection Load
 
    Every time you submit a prompt:
-   - omc: keyword-detector + skill-injector (~500-2000 tokens)
-   - vercel-plugin: best-practices injector (~200-800 tokens)
-   - moltbloat: (none on submit)
+   <for each plugin with UserPromptSubmit hooks, list: name, hook description, estimated token output>
 
    Every tool call:
-   - omc: PreToolUse reminder (~100 tokens)
-   - vercel-plugin: PreToolUse patterns (~100-300 tokens)
-   - moltbloat: PostToolUse usage tracker (no output)
+   <for each plugin with PreToolUse/PostToolUse hooks, list: name, hook description, whether it produces output>
 
-   **Estimated per-message injection**: ~800-3,100 tokens from hooks alone
-   **Over 200 messages**: ~160K-620K tokens just from hook injections
+   **Estimated per-message injection**: ~<X> tokens from hooks alone
+   **Over 200 messages**: ~<Y> tokens just from hook injections
    ```
 
 7. **Generate report**

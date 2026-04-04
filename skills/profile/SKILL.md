@@ -47,7 +47,7 @@ Manage named profiles that enable/disable specific plugins and rule sets. Switch
    ls ~/.moltbloat/profiles/*.json 2>/dev/null
    ```
 
-   Always show the built-in profiles plus any custom ones:
+   Always show the built-in profiles plus any custom ones. For built-in profiles, dynamically compute plugin counts and token estimates based on what's actually installed:
 
    ```
    # Moltbloat Profiles
@@ -55,20 +55,18 @@ Manage named profiles that enable/disable specific plugins and rule sets. Switch
    ## Built-in
    | Profile | Plugins Enabled | Est. Token Cost | Best For |
    |---------|----------------|-----------------|----------|
-   | lean | 2-3 (core only) | ~5,000 | Quick edits, simple tasks |
-   | full | all enabled | ~40,000+ | Complex features, multi-file work |
-   | frontend | web-focused | ~18,000 | React/Next.js/Vercel work |
-   | backend | server-focused | ~15,000 | APIs, databases, infrastructure |
+   | lean | <N> (core only) | ~<X> | Quick edits, simple tasks |
+   | full | <N> (all) | ~<X> | Complex features, multi-file work |
+   | frontend | <N> (web-related) | ~<X> | Frontend/UI work |
+   | backend | <N> (server-related) | ~<X> | APIs, databases, infrastructure |
 
    ## Custom
-   | Profile | Plugins | Created |
-   |---------|---------|---------|
-   | my-kotlin | 6 plugins | 2026-03-15 |
+   <list saved profiles from ~/.moltbloat/profiles/*.json>
 
    ## Current State
    - Active profile: <name or "none (manual config)">
-   - Enabled plugins: X
-   - Est. token cost: ~Y
+   - Enabled plugins: <N>
+   - Est. token cost: ~<X>
 
    Use `/moltbloat:profile apply <name>` to switch.
    ```
@@ -81,27 +79,17 @@ Manage named profiles that enable/disable specific plugins and rule sets. Switch
    cat ~/.claude/plugins/installed_plugins.json 2>/dev/null
    ```
 
-   Present a checklist:
+   Present a checklist of all installed plugins, dynamically grouped by what they provide:
+
    ```
    Creating profile: <name>
 
    Select which plugins to ENABLE (all others will be disabled):
 
-   ## Orchestration
-   - [?] oh-my-claudecode (32 skills, 19 agents, ~16K tokens)
-   - [?] superpowers (14 skills, ~2.8K tokens)
+   <For each installed plugin, show: name, skill count, agent count, MCP count, estimated token cost>
+   <Group by rough category based on plugin description/keywords: orchestration, development, data, tooling, etc.>
 
-   ## Development
-   - [?] everything-claude-code (108 skills, ~4.2K tokens)
-   - [?] playwright (browser automation, ~8.7K tokens)
-   - [?] vercel-plugin (40 skills, ~8.5K tokens)
-
-   ## Data
-   - [?] claude-mem (cross-session memory, ~3.1K tokens)
-   - [?] supabase (database ops, ~2K tokens)
-
-   ## Other
-   - [?] moltbloat (this plugin — always recommended)
+   - [?] <plugin-name> (<N> skills, <M> agents, ~<X>K tokens)
    - [?] ...
 
    Reply with the names to enable, or "all except X, Y".
@@ -137,22 +125,26 @@ Manage named profiles that enable/disable specific plugins and rule sets. Switch
    cat ~/.moltbloat/profiles/<name>.json
    ```
 
-   For built-in profiles, use these defaults:
+   For built-in profiles, dynamically categorize installed plugins:
 
    **lean:**
-   - Enable: oh-my-claudecode, moltbloat
+   - Enable: only moltbloat + the single plugin with the most skills (likely the user's primary orchestrator)
    - Disable: everything else
 
    **full:**
    - Enable: everything currently installed
 
    **frontend:**
-   - Enable: oh-my-claudecode, vercel-plugin, playwright, superpowers, moltbloat
-   - Disable: supabase, language-specific plugins not related to TS/JS
+   - Scan installed plugins for frontend-related keywords in their skills/descriptions (react, next, css, component, browser, playwright, design, UI, vercel, deploy)
+   - Enable: matches + moltbloat
+   - Disable: everything else
 
    **backend:**
-   - Enable: oh-my-claudecode, supabase, claude-mem, superpowers, moltbloat
-   - Disable: playwright, vercel-plugin, frontend-design
+   - Scan installed plugins for backend-related keywords in their skills/descriptions (database, api, server, sql, auth, docker, infrastructure, supabase, redis)
+   - Enable: matches + moltbloat
+   - Disable: everything else
+
+   For any built-in profile, list the actual plugins that would be enabled/disabled before applying — let the user confirm.
 
    **4c. Apply changes**
 
@@ -197,17 +189,11 @@ Manage named profiles that enable/disable specific plugins and rule sets. Switch
    ```
    ## Auto-Generated Profile Based on Your Usage
 
-   Based on 14 days of tracking, you actively use:
-   - oh-my-claudecode (47 invocations)
-   - vercel-plugin (23 invocations)
-   - playwright (12 invocations)
-   - superpowers (8 invocations)
-   - moltbloat (5 invocations)
+   Based on <N> days of tracking, you actively use:
+   <list each plugin with >0 invocations, sorted by count>
 
    These had zero usage and can be safely disabled:
-   - everything-claude-code (0 invocations — saves ~4,200 tokens)
-   - claude-mem (0 invocations — saves ~3,100 tokens)
-   - ...
+   <list each plugin with 0 invocations and estimated token savings>
 
    Save as profile? (name it, or "skip")
    ```
