@@ -5,7 +5,7 @@ level: 3
 ---
 
 <Purpose>
-Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated report of bloat, redundancy, stale configs, superseded plugins, and actionable cleanup recommendations.
+Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated report of bloat, redundancy, stale configs, and actionable cleanup recommendations. All checks are dynamic — no hardcoded plugin names or curated opinion lists.
 </Purpose>
 
 <Use_When>
@@ -87,47 +87,45 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
 
    Apply these deterministic rules against the collected inventory. Each check produces a finding or passes silently.
 
-   ### Check 1: Superseded Plugins
-   Flag if BOTH of these are installed:
-   - `vercel` (old) AND `vercel-plugin` (new) → old is superseded
-   - `ralph-loop` AND `oh-my-claudecode` (which has native ralph skill) → ralph-loop is superseded
-   - `claude-hud` AND `oh-my-claudecode` (which has native HUD) → claude-hud may be superseded
+   ### Check 1: Skill Name Collisions
+   Build a map of skill names across all plugins. If two or more plugins provide a skill with the same name, flag it — the user may not know which one runs.
+   - CRITICAL if 5+ collisions between the same two plugins (indicates a wholesale duplicate)
+   - HIGH if individual collisions exist between different plugins
 
-   General rule: if a plugin has 0 skills AND another installed plugin provides equivalent functionality, flag it.
-
-   ### Check 2: Zero-Skill Plugins
-   For each enabled plugin, count its skills. Flag any enabled plugin with 0 skills that also has no MCP servers configured — it's doing nothing.
-
-   ### Check 3: Disabled Plugins Still Installed
-   List all disabled plugins. These consume disk space and clutter the registry. Flag as LOW severity — suggest uninstalling if unused for 30+ days (check lastUpdated).
-
-   ### Check 4: MCP Redundancy with Native Features
-   Flag these specific MCPs as redundant:
-   - `filesystem` MCP → Claude Code has native Read/Write/Glob/Grep
-   - `memory` MCP (generic @modelcontextprotocol/server-memory) when `claude-mem` plugin is also installed → claude-mem is a superset
-   - Any MCP named `sequential-thinking` → Claude has native extended thinking
-
-   ### Check 5: Duplicate MCP Servers
-   Check if the same underlying MCP server is loaded from both global config AND a plugin. Common case: `playwright` in mcp-servers.json AND as a plugin.
+   ### Check 2: Duplicate MCP Servers
+   Check if the same underlying MCP server is loaded from both global config AND a plugin, or from multiple plugins.
 
    Compare MCP server names and npm package names across all sources. Flag duplicates.
+   - CRITICAL if same MCP is loaded from 2+ sources (causes tool name conflicts)
 
-   ### Check 6: Agent Overlap
+   ### Check 3: Agent Overlap
    Compare agent filenames in `~/.claude/agents/` against agents provided by installed plugins. If the same agent name exists in both places, flag it — the user is maintaining two versions.
 
    Read the first 5 lines of each duplicate pair to check if they're identical or diverged.
+   - HIGH if identical (pure duplication)
+   - MEDIUM if diverged (user customized — note but don't push removal)
 
-   ### Check 7: Skill Name Collisions
-   Build a map of skill names across all plugins. If two plugins provide a skill with the same name, flag it — the user may not know which one runs.
+   ### Check 4: Zero-Skill Plugins
+   For each enabled plugin, count its skills, MCP servers, agents, hooks, and rules. Flag any enabled plugin providing none of these — it's doing nothing.
+   - MEDIUM severity
 
-   ### Check 8: Rules Without Matching Languages
+   ### Check 5: Disabled Plugins Still Installed
+   List all disabled plugins. These consume disk space and clutter the registry.
+   - LOW severity — suggest uninstalling if unused for 30+ days (check lastUpdated)
+
+   ### Check 6: Stale Cache Versions
+   For each plugin, check if multiple versions exist in the cache directory. Only the active version (from `installed_plugins.json`) is needed — older versions are waste.
+   - MEDIUM if stale versions total > 10 MB
+   - LOW otherwise
+
+   ### Check 7: Rules Without Matching Languages
    For the current working directory (or the user's Projects directory), check which programming languages are actually present:
    ```bash
    find ~/Projects -maxdepth 3 -name "*.go" -o -name "*.rs" -o -name "*.py" -o -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" -o -name "*.kt" -o -name "*.swift" -o -name "*.php" -o -name "*.pl" -o -name "*.cpp" -o -name "*.c" -o -name "*.java" 2>/dev/null | sed 's/.*\.//' | sort | uniq -c | sort -rn
    ```
    Compare against installed rule directories in `~/.claude/rules/`. Flag rule sets for languages with 0 files in any project as LOW severity.
 
-   ### Check 9: Stale Project Configs
+   ### Check 8: Stale Project Configs
    Check `~/.claude/projects/` for directories that don't correspond to any existing project path:
    ```bash
    for dir in ~/.claude/projects/*/; do
@@ -138,7 +136,7 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    ```
    Flag orphaned project configs.
 
-   ### Check 10: Large Caches
+   ### Check 9: Large Caches
    Flag any single cache directory over 50MB. Flag total plugin cache over 500MB.
 
 4. **Classify findings**
@@ -175,7 +173,7 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    ### HIGH (X)
    | # | Finding | Source | Action |
    |---|---------|--------|--------|
-   | 1 | `ralph-loop` plugin superseded by OMC native ralph | Plugins | Uninstall ralph-loop |
+   | 1 | <description of finding> | <source> | <recommended action> |
    | 2 | ... | ... | ... |
 
    ### MEDIUM (X)
