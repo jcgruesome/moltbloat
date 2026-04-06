@@ -22,11 +22,13 @@ Capture the current state of the Claude Code ecosystem as a JSON baseline. On su
 
 <Steps>
 
-1. **Parse subcommand**
+1. **Parse subcommand and flags**
 
-   Check if user specified a subcommand:
+   Check if user specified:
    - `/moltbloat:snapshot` — save baseline (default)
    - `/moltbloat:snapshot trends` — show trend analysis
+   - `/moltbloat:snapshot --export <path>` — export snapshot to file
+   - `/moltbloat:snapshot --json` — output snapshot JSON to stdout
 
 2. **For "trends" — analyze history**
 
@@ -160,18 +162,29 @@ Capture the current state of the Claude Code ecosystem as a JSON baseline. On su
    - 1 new disabled plugin — consider uninstalling if unused
    ```
 
-7. **Save the new baseline**
+7. **Save the new baseline and handle exports**
 
    ```bash
    mkdir -p ~/.moltbloat
    ```
 
-   Write the JSON snapshot to `~/.moltbloat/baseline.json`.
+   If `--export <path>` was specified:
+   - Write JSON snapshot to the specified path
+   - Do NOT update baseline.json (this is an export, not a new baseline)
+   - Report: `Snapshot exported to <path>`
+   - Stop here
 
-   Also append a one-line summary to `~/.moltbloat/history.log`:
-   ```
-   2026-04-03T15:30:00Z | plugins=20 skills=71 mcps=27 tokens=~37325 disk=967MB
-   ```
+   If `--json` was specified:
+   - Output the JSON snapshot to stdout
+   - Do NOT save to baseline.json
+   - Stop here
+
+   Otherwise (standard snapshot mode):
+   - Write JSON snapshot to `~/.moltbloat/baseline.json`
+   - Append one-line summary to `~/.moltbloat/history.log`:
+     ```
+     2026-04-03T15:30:00Z | plugins=20 skills=71 mcps=27 tokens=~37325 disk=967MB
+     ```
 
    Output confirmation:
    ```

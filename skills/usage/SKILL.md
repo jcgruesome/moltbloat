@@ -168,34 +168,38 @@ Analyze usage data collected by the moltbloat tracking hook to show what's actua
    - Run `/moltbloat:clean` to remove confirmed dead weight
    ```
 
-6. **Compact old usage data**
+6. **Compact old usage data (auto or manual)**
 
    Check if the usage file has grown large enough to benefit from compaction:
    ```bash
    wc -l < ~/.moltbloat/usage.jsonl 2>/dev/null
    ```
 
-   Get threshold from config:
+   Get thresholds from config:
    ```bash
    compact_threshold=$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get thresholds.usage_compact_lines 2>/dev/null || echo 5000)
+   auto_compact=$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get defaults.auto_compact 2>/dev/null || echo true)
    ```
 
-   If usage file exceeds threshold, offer to compact:
+   **If auto_compact is enabled and threshold exceeded:**
+   Automatically compact without prompting:
+   > Usage log has <N> entries. Auto-compacting (config: defaults.auto_compact=true)...
 
+   **If auto_compact is disabled and threshold exceeded:**
+   Offer to compact:
    > Usage log has <N> entries. Compact old data to keep it fast?
-   > This aggregates entries older than 30 days into daily summaries and
-   > removes the raw lines. Recent data (last 30 days) stays untouched.
+   > Enable auto-compact in config to do this automatically.
 
-   If user confirms:
+   **Compaction process:**
 
-   **7a.** Read all entries, split into recent (last 30 days) and old.
+   **6a.** Read all entries, split into recent (last 30 days) and old.
 
-   **7b.** Aggregate old entries into daily summaries:
+   **6b.** Aggregate old entries into daily summaries:
    ```json
    {"date":"<date>","type":"summary","skills":{"<name>":<count>},"agents":{"<name>":<count>},"mcps":{"<name>":<count>},"tools":{"<name>":<count>},"total":<count>}
    ```
 
-   **7c.** Write compacted file:
+   **6c.** Write compacted file:
    ```bash
    # Back up first
    cp ~/.moltbloat/usage.jsonl ~/.moltbloat/usage.jsonl.bak
@@ -205,7 +209,7 @@ Analyze usage data collected by the moltbloat tracking hook to show what's actua
    mv ~/.moltbloat/usage.jsonl.new ~/.moltbloat/usage.jsonl
    ```
 
-   **7d.** Report:
+   **6d.** Report:
    ```
    Compacted: <old_count> raw entries → <summary_count> daily summaries
    Kept: <recent_count> recent entries (last 30 days)
@@ -213,7 +217,7 @@ Analyze usage data collected by the moltbloat tracking hook to show what's actua
    Backup: ~/.moltbloat/usage.jsonl.bak
    ```
 
-   If user declines or <5,000 lines, skip silently.
+   If auto_compact is disabled and user declines, skip silently.
 
 7. **Done**
 

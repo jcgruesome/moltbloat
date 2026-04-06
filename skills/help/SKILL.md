@@ -27,8 +27,10 @@ Display all available moltbloat commands with brief descriptions so the user kno
    | Command | Description |
    |---------|-------------|
    | `/moltbloat:audit` | Full ecosystem scan — finds redundancy, collisions, conflicts, staleness, and scores health (0-100) |
+   | `/moltbloat:audit --json` | Export audit results as JSON for CI integration |
+   | `/moltbloat:audit --export <path>` | Save audit results to file |
    | `/moltbloat:token-budget` | Context window cost analysis — shows what each plugin costs in tokens and dollars |
-   | `/moltbloat:usage` | What you actually use vs what's installed, hook overhead, data compaction |
+   | `/moltbloat:usage` | What you actually use vs what's installed, hook overhead, data compaction (auto-compact configurable) |
 
    ## Investigate
    | Command | Description |
@@ -43,8 +45,10 @@ Display all available moltbloat commands with brief descriptions so the user kno
    | `/moltbloat:clean` | Interactive cleanup — review findings and selectively remove bloat |
    | `/moltbloat:clean --dry-run` | Preview cleanup actions without making changes |
    | `/moltbloat:profile` | Switch ecosystem configs, create/export/import profiles for team sharing |
+   | `/moltbloat:profile suggest` | Intelligent profile creation based on usage + audit data |
    | `/moltbloat:snapshot` | Save current ecosystem as baseline for future drift detection |
    | `/moltbloat:snapshot trends` | Show historical trends and growth over time |
+   | `/moltbloat:snapshot --export <path>` | Export snapshot JSON to file |
 
    ## System
    | Command | Description |

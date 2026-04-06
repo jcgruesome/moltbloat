@@ -7,7 +7,7 @@ import sys
 CONFIG_PATH = os.path.expanduser("~/.moltbloat/config.json")
 
 DEFAULT_CONFIG = {
-    "version": "1.0",
+    "version": "1.1",
     "created": "",
     "thresholds": {
         "token_warning": 30000,
@@ -47,6 +47,12 @@ DEFAULT_CONFIG = {
         "auto_compact": True,
         "snapshot_reminder": True,
         "show_dollar_costs": True
+    },
+    "ignored_findings": [],
+    "export": {
+        "default_format": "json",
+        "include_usage_data": True,
+        "anonymize": False
     }
 }
 

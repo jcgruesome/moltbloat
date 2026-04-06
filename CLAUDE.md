@@ -8,7 +8,8 @@ Run `/moltbloat:help` for the full command reference.
 
 ### Core
 - `/moltbloat:help` — Show all available commands
-- `/moltbloat:audit` — Full ecosystem scan with severity-rated findings, health score (0-100), and compatibility checking
+- `/moltbloat:audit` — Full ecosystem scan with severity-rated findings, health score (0-100), compatibility checking, and usage-based recommendations
+- `/moltbloat:audit --json` — Export audit results as JSON for CI integration
 - `/moltbloat:token-budget` — Context window cost analysis with dollar estimates (Opus/Sonnet/Haiku)
 - `/moltbloat:clean` — Interactive cleanup with confirmation before each action
 - `/moltbloat:clean --dry-run` — Preview cleanup actions without making changes
@@ -22,7 +23,9 @@ Run `/moltbloat:help` for the full command reference.
 
 ### Management
 - `/moltbloat:profile` — Switch between ecosystem configs (lean/full/frontend/backend/custom)
+- `/moltbloat:profile suggest` — Intelligent profile creation based on usage + audit data
 - `/moltbloat:snapshot` — Save ecosystem baseline, detect drift on future runs
+- `/moltbloat:snapshot --export <path>` — Export snapshot JSON to file
 - `/moltbloat:team-report` — Aggregate findings across team members for standardization
 
 ## Hooks

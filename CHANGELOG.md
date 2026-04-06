@@ -53,13 +53,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic data compaction for usage logs >5,000 lines
 - Read-only by default (only clean/profile modify state)
 
+## [0.6.0] - TBD
+
+### Added
+- **Export to JSON** — `audit --json`, `audit --export <path>`, `snapshot --export <path>`
+- **Auto-compact** — Usage data automatically compacts when threshold exceeded (configurable)
+- **Ignored findings** — Config option to dismiss false positives (`ignored_findings` array)
+- **Smart duplicate detection** — Semantic analysis of plugin overlap beyond exact name matches
+- **Usage-based recommendations** — Cross-references audit findings with actual usage data
+- **`/moltbloat:profile suggest`** — Intelligent profile creation combining usage + audit data
+
+### Changed
+- **Config schema v1.1** — Added `ignored_findings`, `export` settings
+- **Usage skill** — Supports automatic compaction (config: `defaults.auto_compact`)
+- **Audit skill** — Enhanced with usage data cross-reference and smarter duplicate detection
+- **Profile skill** — New `suggest` subcommand for one-click optimization
+
 ## Future Considerations
 
 Features being evaluated for potential inclusion:
 
-- **Export to JSON** — Machine-readable audit output for CI integration
 - **Scheduled snapshot reminders** — Weekly/monthly instead of just 30-day
-- **Plugin ignore list** — Exclude specific plugins from audit findings
+- **Plugin recommendation** — "Teams working on similar projects also use: X, Y"
+- **Budget alerts** — Warn when token overhead exceeds a threshold
 - **Backup/restore** — Full ecosystem backup and restore
 
 These will only be added if they don't increase complexity disproportionately to their value.

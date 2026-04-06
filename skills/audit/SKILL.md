@@ -11,6 +11,7 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
 <Use_When>
 - User wants to understand what's installed and whether it's all needed
 - User says "audit", "bloat", "cleanup check", "what's installed", "ecosystem health", "conflicts", "compatibility"
+- User runs `/moltbloat:audit --json` for machine-readable output
 - After installing new plugins or upgrading Claude Code
 - Periodically (monthly) to catch drift
 </Use_When>
@@ -22,19 +23,46 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
 
 <Steps>
 
-1. **Announce the audit**
+1. **Parse arguments**
 
-   Tell the user:
+   Check for flags:
+   - `/moltbloat:audit` — standard text report
+   - `/moltbloat:audit --json` — machine-readable JSON output
+   - `/moltbloat:audit --export <path>` — save JSON to file
+
+2. **Announce the audit**
+
+   If not in JSON mode, tell the user:
    > Running full ecosystem audit on `~/.claude/`...
 
-2. **Load configuration**
+3. **Load configuration and usage data**
 
-   Load thresholds and scoring weights from config:
+   Load thresholds, scoring weights, and ignored findings from config:
    ```bash
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get thresholds.token_warning
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get thresholds.token_critical
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get health_score
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get ignored_findings
    ```
+
+   Filter out any findings that match `ignored_findings` patterns (by plugin name or finding type).
+
+   **Load usage data (if available):**
+   ```bash
+   # Check if usage tracking data exists
+   wc -l ~/.moltbloat/usage.jsonl 2>/dev/null || echo 0
+   
+   # Extract plugin usage counts from last 30 days
+   grep '"type":"skill"' ~/.moltbloat/usage.jsonl 2>/dev/null | \
+     grep -o '"name":"[^"]*"' | sort | uniq -c | sort -rn
+   ```
+
+   **Usage-based findings enhancement:**
+   - If usage data exists, annotate findings with usage stats:
+     - "Plugin X (zero usage in 30 days) — 12 skills wasting ~300 tokens"
+     - "Plugin Y (used 45 times) — keep despite some overlap"
+   - Cross-reference zero-usage plugins with findings
+   - Prioritize removing unused plugins that also have audit findings
 
 3. **Collect inventory**
 
@@ -249,6 +277,44 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    Flag if same MCP server name appears from multiple sources (e.g., playwright from both global config AND plugin).
    - CRITICAL: Same MCP loaded from 2+ sources (tool name conflicts)
 
+### Check 12: Semantic Duplicates (Smart Detection)
+   Detect plugins that likely overlap in functionality, even with different names:
+
+   **Keyword-based detection:**
+   - Extract keywords from plugin names, CLAUDE.md descriptions, skill names
+   - Group plugins sharing significant keyword overlap
+
+   **Example patterns:**
+   - "vercel" in name → likely deployment-related
+   - "lsp" or "typescript" or "pyright" → language server functionality
+   - "git", "commit", "github" → version control features
+
+   **Implementation:**
+   ```bash
+   # For each plugin, extract keywords from name and CLAUDE.md
+   for plugin_dir in <active install paths>; do
+     plugin_name=$(basename "$(dirname "$plugin_dir")")
+     keywords="$plugin_name"
+     
+     # Add keywords from CLAUDE.md if exists
+     if [ -f "$plugin_dir/CLAUDE.md" ]; then
+       # Extract first 20 lines, get key terms
+       head -20 "$plugin_dir/CLAUDE.md" | grep -oE '\b[a-z]{4,}\b' | tr '\n' ' '
+     fi
+     
+     echo "$plugin_name: $keywords"
+   done
+   ```
+
+   **Flag as HIGH when:**
+   - Two plugins share >3 significant keywords
+   - Both have similar skill counts in overlapping domains
+   - Example: "vercel" and "vercel-plugin" both mention deployment, preview, production
+
+   **Flag as MEDIUM when:**
+   - Two plugins share some keywords but have different primary purposes
+   - Example: "typescript-lsp" and "pyright-lsp" (different languages, same pattern)
+
 4. **Classify findings**
 
    Assign severity to each finding:
@@ -260,9 +326,15 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    | **MEDIUM** | Waste — consuming resources (disk, tokens, context) for no benefit |
    | **LOW** | Cleanup opportunity — not harmful but clutters the ecosystem |
 
-6. **Generate report**
+7. **Generate report**
 
-   Output the report in this exact format:
+   If `--json` or `--export` specified, output JSON format (see step 7a).
+   Otherwise, output the standard text report:
+
+   ```
+   # Moltbloat Ecosystem Audit
+   ...
+   ```
 
    ```
    # Moltbloat Ecosystem Audit
@@ -351,6 +423,49 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    - 70-89: Healthy — some cleanup opportunities
    - 50-69: Bloated — significant redundancy
    - 0-49: Critical — major cleanup needed
+
+7a. **JSON Export format**
+
+   If JSON output requested, structure as:
+   ```json
+   {
+     "metadata": {
+       "version": "0.6.0",
+       "timestamp": "2026-04-05T21:30:00Z",
+       "claude_version": "2.1.92",
+       "total_plugins": 21,
+       "total_skills": 275,
+       "total_mcp_servers": 16,
+       "health_score": 45
+     },
+     "plugins": [
+       {
+         "name": "plugin-name",
+         "version": "1.0.0",
+         "enabled": true,
+         "skills": 12,
+         "mcp_servers": 2,
+         "est_tokens": 3000
+       }
+     ],
+     "findings": {
+       "critical": [...],
+       "high": [...],
+       "medium": [...],
+       "low": [...]
+     },
+     "summary": {
+       "total_findings": 8,
+       "recoverable_disk_mb": 150,
+       "est_token_savings": 25000
+     }
+   }
+   ```
+
+   If `--export <path>` specified, write to file and confirm:
+   > Audit exported to `<path>`
+
+   If `--json` specified without path, output to stdout.
 
 8. **Done**
 

@@ -37,6 +37,7 @@ Manage named profiles that enable/disable specific plugins and rule sets. Switch
    - `/moltbloat:profile apply <name>` — switch to a profile
    - `/moltbloat:profile restore` — return to pre-switch state
    - `/moltbloat:profile auto` — suggest a profile based on usage data
+   - `/moltbloat:profile suggest` — intelligent suggestion based on usage + audit data
    - `/moltbloat:profile export <name>` — export a profile to a shareable JSON file
    - `/moltbloat:profile import <path>` — import a profile from a file or URL
 
@@ -198,6 +199,63 @@ Manage named profiles that enable/disable specific plugins and rule sets. Switch
 
    Save as profile? (name it, or "skip")
    ```
+
+6b. **For `suggest` — intelligent recommendation**
+
+   Combines usage data with audit findings to recommend an optimal profile:
+
+   ```bash
+   # Get usage data
+   cat ~/.moltbloat/usage.jsonl 2>/dev/null
+   
+   # Get recent audit findings (if available in conversation history)
+   # Or run quick check for zero-skill plugins and duplicates
+   ```
+
+   Build recommendation list:
+
+   **TIER 1 — Definitely Keep (used in last 14 days):**
+   <plugins with >0 invocations>
+
+   **TIER 2 — Probably Keep (skills you might need):**
+   <plugins with 0 usage but unique functionality, no duplicates>
+
+   **TIER 3 — Consider Removing (audit flags):**
+   <zero-skill plugins, duplicates, disabled plugins>
+   
+   **TIER 4 — Safe to Disable (unused + redundant):**
+   <plugins with 0 usage AND overlapping functionality>
+
+   Calculate potential savings:
+   - Token reduction: ~X tokens (Y% of current)
+   - Cost savings: ~$Z per message
+
+   ```
+   ## Suggested "Lean" Profile
+
+   Based on your usage patterns and audit findings:
+
+   **Will Enable (Tiers 1-2):** <N> plugins
+   - <list>
+
+   **Will Disable (Tiers 3-4):** <N> plugins  
+   - <list with reasons: "zero usage", "duplicate of X", "no skills">
+
+   **Estimated Impact:**
+   - Token reduction: ~12,000 tokens (from 69K to 57K)
+   - Cost savings: ~$0.18 per message (Sonnet)
+   - Health score: 45 → 72
+
+   **Create and apply this profile?** (yes / save-only / no)
+   ```
+
+   If yes:
+   1. Save current state for restore
+   2. Save suggested profile as "lean-suggested"
+   3. Apply the profile (disable/enable plugins)
+   4. Report changes
+
+   This is the fastest way to clean up bloat based on actual usage + structural analysis.
 
 7. **For `export` — share a profile**
 
