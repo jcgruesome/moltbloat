@@ -165,7 +165,7 @@ Manage named profiles that enable/disable specific plugins and rule sets. Switch
    Disabled: plugin-d, plugin-e
 
    Token savings: ~X tokens/session vs previous state
-   Cost savings: ~$X.XX per message
+   Cost savings: ~$<calculated> per message
 
    Restart your session for changes to take effect.
    Use `/moltbloat:profile restore` to return to previous state.

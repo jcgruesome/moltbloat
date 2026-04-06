@@ -182,9 +182,9 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
 
    | Model | Per Message | Per Day (200 msgs) | Per Month |
    |-------|------------|-------------------|-----------|
-   | Opus 4.6 | $X.XXXX | $X.XX | $X.XX |
-   | Sonnet 4.6 | $X.XXXX | $X.XX | $X.XX |
-   | Haiku 4.5 | $X.XXXX | $X.XX | $X.XX |
+   | Opus 4.6 | $<per-message> | $<per-day> | $<per-month> |
+   | Sonnet 4.6 | $<per-message> | $<per-day> | $<per-month> |
+   | Haiku 4.5 | $<per-message> | $<per-day> | $<per-month> |
 
    **Note**: This is the FIXED overhead cost — the ecosystem tax you pay on every message regardless of what you're doing. Your actual message content and tool results are on top of this.
 

@@ -183,7 +183,7 @@ Act on findings from `/moltbloat:audit`. Walk through each finding interactively
    ## Estimated Impact (if applied)
    - Disk space that would be recovered: ~X MB
    - Token overhead that would be removed: ~X tokens/session
-   - Estimated cost savings: ~$X.XX per message
+   - Estimated cost savings: ~$<calculated> per message
 
    ## Commands That Would Run
    <list each command that would be executed>

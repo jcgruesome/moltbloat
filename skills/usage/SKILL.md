@@ -160,7 +160,7 @@ Analyze usage data collected by the moltbloat tracking hook to show what's actua
    - X of Y MCP servers (Z% idle)
 
    **Estimated wasted tokens**: ~X tokens/session on unused components
-   **Estimated wasted cost**: ~$X.XX per message on dead weight
+   **Estimated wasted cost**: ~$<calculated> per message on dead weight
 
    ## Recommendations
    - Consider creating a `/moltbloat:profile` based on your actual usage
