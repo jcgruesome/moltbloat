@@ -5,13 +5,13 @@
   },
   "metadata": {
     "description": "Audit your Claude Code ecosystem for bloat, redundancy, and token waste",
-    "version": "0.4.0"
+    "version": "0.5.0"
   },
   "plugins": [
     {
       "name": "moltbloat",
       "source": "./",
-      "description": "Ecosystem auditor with usage tracking, profiles, cost analysis, and compatibility checks. Scans plugins, MCPs, skills, agents, and rules for bloat and redundancy.",
+      "description": "Ecosystem auditor with usage tracking, profiles, cost analysis, compatibility checks, trend visualization, self-diagnostics, and configurable thresholds. Scans plugins, MCPs, skills, agents, and rules for bloat and redundancy.",
       "category": "utilities",
       "tags": ["audit", "bloat", "cleanup", "ecosystem", "tokens", "usage", "profiles", "cost"]
     }

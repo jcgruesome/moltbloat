@@ -8,15 +8,16 @@ Run `/moltbloat:help` for the full command reference.
 
 ### Core
 - `/moltbloat:help` — Show all available commands
-- `/moltbloat:audit` — Full ecosystem scan with severity-rated findings and health score (0-100)
+- `/moltbloat:audit` — Full ecosystem scan with severity-rated findings, health score (0-100), and compatibility checking
 - `/moltbloat:token-budget` — Context window cost analysis with dollar estimates (Opus/Sonnet/Haiku)
 - `/moltbloat:clean` — Interactive cleanup with confirmation before each action
+- `/moltbloat:clean --dry-run` — Preview cleanup actions without making changes
+- `/moltbloat:doctor` — Self-diagnostic for installation health and dependencies
 
 ### Intelligence
 - `/moltbloat:changelog` — Diff current ecosystem against your last snapshot to see what changed
 - `/moltbloat:depends` — Dependency graph showing what each plugin provides and blast radius of removal
 - `/moltbloat:why <plugin>` — Quick lookup: what does this plugin give me, overlaps, token cost, keep/remove verdict
-- `/moltbloat:compat` — Detect plugin conflicts: hook collisions, skill shadowing, MCP tool overlaps
 - `/moltbloat:usage` — What you actually use vs what's installed (requires tracking data)
 
 ### Management
@@ -36,6 +37,7 @@ Run `/moltbloat:help` for the full command reference.
 - `~/.moltbloat/baseline.json` — Ecosystem snapshot (created by `/moltbloat:snapshot`)
 - `~/.moltbloat/history.log` — One-line snapshot summaries over time (appended by `/moltbloat:snapshot`)
 - `~/.moltbloat/profiles/*.json` — Saved profiles (created by `/moltbloat:profile`)
+- `~/.moltbloat/config.json` — Configuration file with thresholds and defaults (edit directly)
 
 ## Design Principles
 
@@ -44,3 +46,5 @@ Run `/moltbloat:help` for the full command reference.
 - Reports are actionable — every finding has a specific fix action.
 - Usage tracking is silent and lightweight (typically <50ms; hard timeout of 2s).
 - Dollar costs make token waste tangible.
+- Configurable thresholds — edit `~/.moltbloat/config.json` to customize.
+- Merged functionality over many small skills — 12 focused skills instead of 15 scattered ones.

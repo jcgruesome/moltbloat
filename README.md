@@ -1,5 +1,7 @@
 # moltbloat
 
+[![CI](https://github.com/jcgruesome/moltbloat/actions/workflows/ci.yml/badge.svg)](https://github.com/jcgruesome/moltbloat/actions/workflows/ci.yml)
+
 A Claude Code plugin that audits your ecosystem for bloat, redundancy, and token waste — with usage tracking, cost analysis, and ecosystem profiles.
 
 ## Install
@@ -18,10 +20,12 @@ claude plugin install moltbloat
 
 ### Core — audit, understand costs, clean up
 ```
-/moltbloat:help           # Show all available commands
-/moltbloat:audit          # Full scan with health score (0-100)
-/moltbloat:token-budget   # Context cost breakdown + dollar estimates
-/moltbloat:clean          # Interactive cleanup with confirmation
+/moltbloat:help              # Show all available commands
+/moltbloat:audit             # Full scan with health score (0-100), includes compatibility
+/moltbloat:token-budget      # Context cost breakdown + dollar estimates
+/moltbloat:clean             # Interactive cleanup with confirmation
+/moltbloat:clean --dry-run   # Preview cleanup without making changes
+/moltbloat:doctor            # Self-diagnostic and health check
 ```
 
 ### Intelligence — understand your ecosystem
@@ -29,19 +33,19 @@ claude plugin install moltbloat
 /moltbloat:changelog      # Diff ecosystem against last snapshot
 /moltbloat:depends        # Dependency graph + blast radius
 /moltbloat:why <plugin>   # Quick "should I keep this?" card
-/moltbloat:compat         # Detect hook conflicts + skill shadowing
 /moltbloat:usage          # What you actually use vs what's installed
 ```
 
 ### Management — control your ecosystem
 ```
-/moltbloat:profile list         # See available profiles
-/moltbloat:profile apply lean   # Switch to minimal config
-/moltbloat:profile auto         # Auto-generate profile from usage data
-/moltbloat:profile export <name> # Share a profile as portable JSON
-/moltbloat:profile import <path> # Import a shared profile
-/moltbloat:snapshot             # Save baseline, detect drift
-/moltbloat:team-report          # Aggregate findings across team
+/moltbloat:profile list            # See available profiles
+/moltbloat:profile apply lean      # Switch to minimal config
+/moltbloat:profile auto            # Auto-generate profile from usage data
+/moltbloat:profile export <name>   # Share a profile as portable JSON
+/moltbloat:profile import <path>   # Import a shared profile
+/moltbloat:snapshot                # Save baseline, detect drift
+/moltbloat:snapshot trends         # Show historical trends
+/moltbloat:team-report             # Aggregate findings across team
 ```
 
 ## What makes this different

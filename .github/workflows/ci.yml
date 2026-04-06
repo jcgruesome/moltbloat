@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  validate:
+    name: Validate Plugin Structure
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Run validation script
+        run: bash scripts/validate.sh
+
+  check-bloat:
+    name: Check for Bloat
+    runs-on: ubuntu-latest
+    needs: validate
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check skill count
+        run: |
+          skill_count=$(ls skills/*/SKILL.md 2>/dev/null | wc -l)
+          echo "Skill count: $skill_count"
+          if [ "$skill_count" -gt 15 ]; then
+            echo "ERROR: Too many skills ($skill_count). Consider merging related functionality."
+            exit 1
+          fi
+          if [ "$skill_count" -gt 12 ]; then
+            echo "WARNING: Skill count ($skill_count) is getting high. Review for consolidation opportunities."
+          fi
+
+      - name: Check for duplicate skill names
+        run: |
+          skill_names=$(grep -r "^name:" skills/*/SKILL.md 2>/dev/null | sed 's/.*: //')
+          duplicates=$(echo "$skill_names" | sort | uniq -d)
+          if [ -n "$duplicates" ]; then
+            echo "ERROR: Duplicate skill names found:"
+            echo "$duplicates"
+            exit 1
+          fi
+          echo "No duplicate skill names found."
+
+      - name: Check total size
+        run: |
+          total_bytes=$(find . -type f -not -path './.git/*' -exec cat {} \; 2>/dev/null | wc -c)
+          echo "Total bytes: $total_bytes"
+          # Soft limit at 150KB, hard limit at 200KB
+          if [ "$total_bytes" -gt 200000 ]; then
+            echo "ERROR: Plugin size exceeds 200KB. Consider reducing documentation or merging skills."
+            exit 1
+          fi
+          if [ "$total_bytes" -gt 150000 ]; then
+            echo "WARNING: Plugin size ($total_bytes bytes) is getting large."
+          fi
+
+  test-scripts:
+    name: Test Scripts
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Test Python scripts
+        run: |
+          for script in scripts/*.py; do
+            echo "Testing: $script"
+            python3 -m py_compile "$script"
+          done
+
+      - name: Test Bash scripts
+        run: |
+          for script in scripts/*.sh; do
+            echo "Testing: $script"
+            bash -n "$script"
+          done
+
+      - name: Test config initialization
+        run: |
+          python3 scripts/init-config.py --init
+          python3 scripts/init-config.py --get thresholds.token_warning
+          python3 scripts/init-config.py --dump > /dev/null

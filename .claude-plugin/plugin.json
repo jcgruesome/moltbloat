@@ -1,7 +1,7 @@
 {
   "name": "moltbloat",
-  "version": "0.4.0",
-  "description": "Audit your Claude Code ecosystem for bloat, redundancy, and token waste. Tracks usage, manages profiles, estimates costs.",
+  "version": "0.5.0",
+  "description": "Audit your Claude Code ecosystem for bloat, redundancy, and token waste. Tracks usage, manages profiles, estimates costs. Includes dry-run mode, trend analysis, self-diagnostics, and configurable thresholds.",
   "author": {
     "name": "James"
   },

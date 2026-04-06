@@ -27,9 +27,24 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
    Tell the user:
    > Analyzing context window cost of your Claude Code ecosystem...
 
-2. **Measure each context source**
+2. **Load configuration**
 
-   For each category below, measure the byte size of all files that get injected into context. Use `wc -c` for accuracy. Estimate tokens as `bytes / 4` (conservative approximation for English/code mixed content).
+   Get cost rates and estimation factors from config:
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get costs
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get estimates
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get thresholds.token_warning
+   ```
+
+   Use these values for calculations:
+   - Cost rates: opus_per_1m_tokens, sonnet_per_1m_tokens, haiku_per_1m_tokens
+   - Context window: context_window_tokens (default: 1000000)
+   - Token estimates: tokens_per_byte (default: 0.25), tokens_per_skill, tokens_per_mcp_tool, tokens_per_agent
+   - Daily messages: messages_per_day (default: 200)
+
+3. **Measure each context source**
+
+   For each category below, measure the byte size of all files that get injected into context. Use `wc -c` for accuracy. Estimate tokens using `tokens_per_byte` from config (default: 0.25, i.e., bytes / 4).
 
    Run all measurements in parallel.
 
@@ -117,7 +132,7 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
    done 2>/dev/null
    ```
 
-3. **Build the budget table**
+4. **Build the budget table**
 
    Calculate totals and percentages. Use 1,000,000 tokens as the context window size (1M for opus).
 
@@ -222,7 +237,7 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
    - Run `/moltbloat:audit` for full redundancy analysis
    ```
 
-4. **Done**
+5. **Done**
 
    This skill is read-only. No modifications are made.
 

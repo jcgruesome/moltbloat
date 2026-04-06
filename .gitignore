@@ -3,3 +3,5 @@ node_modules/
 *.log
 .omc/
 .claude/
+__pycache__/
+*.pyc

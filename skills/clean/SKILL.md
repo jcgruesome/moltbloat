@@ -1,16 +1,17 @@
 ---
 name: clean
-description: Interactive cleanup — review audit findings and selectively remove bloat with confirmation before each action
+description: Interactive cleanup — review audit findings and selectively remove bloat with confirmation before each action (supports dry-run)
 level: 3
 ---
 
 <Purpose>
-Act on findings from `/moltbloat:audit`. Walk through each finding interactively, explain what it is, and offer to fix it — with explicit user confirmation before any destructive action.
+Act on findings from `/moltbloat:audit`. Walk through each finding interactively, explain what it is, and offer to fix it — with explicit user confirmation before any destructive action. Supports dry-run mode for previewing changes without applying them.
 </Purpose>
 
 <Use_When>
 - User wants to clean up their Claude Code ecosystem
 - User says "clean", "cleanup", "remove bloat", "fix findings"
+- User says "dry run", "preview", "what would clean do"
 - After running `/moltbloat:audit` and seeing findings they want to address
 </Use_When>
 
@@ -20,7 +21,8 @@ Act on findings from `/moltbloat:audit`. Walk through each finding interactively
 </Do_Not_Use_When>
 
 <Safety>
-- NEVER delete or modify anything without explicit user confirmation
+- NEVER delete or modify anything without explicit user confirmation (in interactive mode)
+- In dry-run mode, NEVER modify anything — only report what would be done
 - NEVER auto-fix multiple findings at once — present each individually
 - ALWAYS explain what will change and what the impact is
 - ALWAYS offer to skip any finding
@@ -30,11 +32,20 @@ Act on findings from `/moltbloat:audit`. Walk through each finding interactively
 
 <Steps>
 
-1. **Run the audit first**
+1. **Parse the command**
+
+   Check if the user specified `--dry-run` or `dry-run`:
+   - `/moltbloat:clean` — interactive mode (default)
+   - `/moltbloat:clean --dry-run` or `/moltbloat:clean dry-run` — preview mode only
+
+   In dry-run mode, set a flag and announce:
+   > Running in **DRY-RUN mode** — no changes will be made. Showing what would be cleaned.
+
+2. **Run the audit first**
 
    If no recent audit results are available in the conversation, run the `/moltbloat:audit` skill first to collect findings. If audit results are already present from an earlier invocation in this session, use those.
 
-2. **Present the cleanup menu**
+3. **Present the cleanup menu**
 
    Show the user a numbered list of all findings from the audit, grouped by severity:
 
@@ -60,13 +71,26 @@ Act on findings from `/moltbloat:audit`. Walk through each finding interactively
    8. [Plugin] <name> — disabled for 60+ days
    9. [Project] Orphaned config — X MB
    10. ...
-
-   Reply with numbers to fix (e.g., "1, 3, 5") or "all high", "all", or "skip".
    ```
 
-3. **Process each selected finding**
+   In **interactive mode**, prompt:
+   > Reply with numbers to fix (e.g., "1, 3, 5") or "all high", "all", or "skip".
 
-   For each finding the user selects, present the specific action and ask for confirmation.
+   In **dry-run mode**, continue to step 4 with all findings selected automatically for preview.
+
+4. **Process each selected finding**
+
+   In **dry-run mode**, for each finding, output:
+   ```
+   ## [DRY-RUN] Finding N: <description>
+
+   **Action that would be taken**: <specific command or removal>
+   **Estimated token savings**: ~X tokens/session
+   **Estimated disk savings**: X MB
+   **Risk**: <low/medium/high> — <explanation>
+   ```
+
+   In **interactive mode**, for each finding the user selects, present the specific action and ask for confirmation.
 
    For each finding type, use the appropriate template. Replace all placeholders with actual values from the audit.
 
@@ -146,9 +170,28 @@ Act on findings from `/moltbloat:audit`. Walk through each finding interactively
    Proceed? (yes/no/skip)
    ```
 
-4. **Generate cleanup report**
+5. **Generate cleanup report**
 
-   After processing all selected findings:
+   In **dry-run mode**, output:
+   ```
+   # Dry-Run Summary
+
+   ## Findings Reviewed
+   - X findings would be addressed
+   - Y findings would be skipped (user preference or safety)
+
+   ## Estimated Impact (if applied)
+   - Disk space that would be recovered: ~X MB
+   - Token overhead that would be removed: ~X tokens/session
+   - Estimated cost savings: ~$X.XX per message
+
+   ## Commands That Would Run
+   <list each command that would be executed>
+
+   To apply these changes, run: `/moltbloat:clean` (without --dry-run)
+   ```
+
+   In **interactive mode**, after processing all selected findings:
 
    ```
    # Cleanup Complete
@@ -170,8 +213,9 @@ Act on findings from `/moltbloat:audit`. Walk through each finding interactively
    ## Next Steps
    - Run `/moltbloat:audit` again to verify clean state
    - Run `/moltbloat:token-budget` to see updated context costs
+   - Run `/moltbloat:snapshot` to save this clean state as a baseline
    ```
 
-5. **Done**
+6. **Done**
 
 </Steps>

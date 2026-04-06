@@ -92,7 +92,7 @@ Analyze usage data collected by the moltbloat tracking hook to show what's actua
 
    Note: These are estimates — actual hook output varies. Hooks that inject `<system-reminder>` tags are the costly ones.
 
-5. **Cross-reference with installed inventory**
+4. **Cross-reference with installed inventory**
 
    Get the full list of installed skills, agents, and MCP servers:
 
@@ -110,7 +110,7 @@ Analyze usage data collected by the moltbloat tracking hook to show what's actua
 
    Compare: which installed items have ZERO usage entries?
 
-6. **Generate the report**
+5. **Generate the report**
 
    ```
    # Moltbloat Usage Report
@@ -168,14 +168,19 @@ Analyze usage data collected by the moltbloat tracking hook to show what's actua
    - Run `/moltbloat:clean` to remove confirmed dead weight
    ```
 
-7. **Compact old usage data**
+6. **Compact old usage data**
 
    Check if the usage file has grown large enough to benefit from compaction:
    ```bash
    wc -l < ~/.moltbloat/usage.jsonl 2>/dev/null
    ```
 
-   If >5,000 lines, offer to compact:
+   Get threshold from config:
+   ```bash
+   compact_threshold=$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get thresholds.usage_compact_lines 2>/dev/null || echo 5000)
+   ```
+
+   If usage file exceeds threshold, offer to compact:
 
    > Usage log has <N> entries. Compact old data to keep it fast?
    > This aggregates entries older than 30 days into daily summaries and
@@ -210,7 +215,7 @@ Analyze usage data collected by the moltbloat tracking hook to show what's actua
 
    If user declines or <5,000 lines, skip silently.
 
-8. **Done**
+7. **Done**
 
    The data keeps accumulating — run again later for updated insights.
 

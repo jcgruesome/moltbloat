@@ -1,15 +1,16 @@
 ---
 name: snapshot
-description: Save ecosystem baseline and detect drift — tracks what changed since last audit
+description: Save ecosystem baseline, detect drift, and analyze trends — tracks what changed and visualizes growth over time
 level: 2
 ---
 
 <Purpose>
-Capture the current state of the Claude Code ecosystem as a JSON baseline. On subsequent runs, diff against the previous baseline to show what changed — new plugins, removed MCPs, token cost delta, resolved/new findings.
+Capture the current state of the Claude Code ecosystem as a JSON baseline. On subsequent runs, diff against the previous baseline to show what changed. Also provides trend analysis over time when history exists.
 </Purpose>
 
 <Use_When>
 - User says "snapshot", "baseline", "save state", "what changed"
+- User says "trends", "history", "over time"
 - After running `/moltbloat:clean` to record the new clean state
 - Periodically to track ecosystem drift
 </Use_When>
@@ -21,7 +22,17 @@ Capture the current state of the Claude Code ecosystem as a JSON baseline. On su
 
 <Steps>
 
-1. **Check for existing baseline**
+1. **Parse subcommand**
+
+   Check if user specified a subcommand:
+   - `/moltbloat:snapshot` — save baseline (default)
+   - `/moltbloat:snapshot trends` — show trend analysis
+
+2. **For "trends" — analyze history**
+
+   Skip to step 8 if running in trends mode.
+
+3. **Check for existing baseline (snapshot mode)**
 
    ```bash
    cat ~/.moltbloat/baseline.json 2>/dev/null
@@ -29,17 +40,17 @@ Capture the current state of the Claude Code ecosystem as a JSON baseline. On su
 
    If a baseline exists, load it for comparison. If not, this is the first snapshot.
 
-2. **Collect current state**
+4. **Collect current state**
 
    Build a JSON object with the current ecosystem state. Run these in parallel:
 
-   **2a. Plugins**
+   **4a. Plugins**
    ```bash
    cat ~/.claude/plugins/installed_plugins.json 2>/dev/null
    ```
    Extract: name, version, enabled/disabled for each plugin.
 
-   **2b. MCP servers**
+   **4b. MCP servers**
    Count MCP servers from settings and plugin configs:
    ```bash
    # From global settings
@@ -48,29 +59,29 @@ Capture the current state of the Claude Code ecosystem as a JSON baseline. On su
    find ~/.claude/plugins/cache -name ".mcp.json" -type f 2>/dev/null | wc -l
    ```
 
-   **2c. Skills count**
+   **4c. Skills count**
    ```bash
    find ~/.claude/plugins/cache -path "*/skills/*/SKILL.md" -type f 2>/dev/null | wc -l
    ```
 
-   **2d. Agents count**
+   **4d. Agents count**
    ```bash
    ls ~/.claude/agents/*.md 2>/dev/null | wc -l
    ```
 
-   **2e. Rules**
+   **4e. Rules**
    ```bash
    ls -d ~/.claude/rules/*/ 2>/dev/null | xargs -I{} basename {}
    ```
 
-   **2f. Disk usage**
+   **4f. Disk usage**
    ```bash
    du -sm ~/.claude/plugins/ 2>/dev/null | awk '{print $1}'
    du -sm ~/.claude/projects/ 2>/dev/null | awk '{print $1}'
    du -sm ~/.claude/ 2>/dev/null | awk '{print $1}'
    ```
 
-   **2g. Token cost estimate**
+   **4g. Token cost estimate**
    ```bash
    # Total bytes of context-loaded content
    total=0
@@ -78,7 +89,7 @@ Capture the current state of the Claude Code ecosystem as a JSON baseline. On su
    find ~/.claude/rules -name "*.md" -type f -exec cat {} + 2>/dev/null | wc -c
    ```
 
-3. **Build the snapshot JSON**
+5. **Build the snapshot JSON**
 
    Construct a JSON object (using a heredoc or jq if available) with this structure:
 
@@ -116,7 +127,7 @@ Capture the current state of the Claude Code ecosystem as a JSON baseline. On su
    }
    ```
 
-4. **If previous baseline exists, compute diff**
+6. **If previous baseline exists, compute diff**
 
    Compare each field and report changes:
 
@@ -141,7 +152,6 @@ Capture the current state of the Claude Code ecosystem as a JSON baseline. On su
    ## New Since Last Snapshot
    <list plugins in current but not in baseline>
 
-
    ## Removed Since Last Snapshot
    - (none)
 
@@ -150,7 +160,7 @@ Capture the current state of the Claude Code ecosystem as a JSON baseline. On su
    - 1 new disabled plugin — consider uninstalling if unused
    ```
 
-5. **Save the new baseline**
+7. **Save the new baseline**
 
    ```bash
    mkdir -p ~/.moltbloat
@@ -163,8 +173,7 @@ Capture the current state of the Claude Code ecosystem as a JSON baseline. On su
    2026-04-03T15:30:00Z | plugins=20 skills=71 mcps=27 tokens=~37325 disk=967MB
    ```
 
-6. **Output confirmation**
-
+   Output confirmation:
    ```
    Snapshot saved to ~/.moltbloat/baseline.json
    History appended to ~/.moltbloat/history.log (X entries total)
@@ -172,7 +181,85 @@ Capture the current state of the Claude Code ecosystem as a JSON baseline. On su
 
    If this was the first snapshot:
    ```
-   First baseline recorded. Run `/moltbloat:snapshot` again later to see drift.
+   First baseline recorded. Run `/moltbloat:snapshot trends` later to see trends.
    ```
+
+   Stop here for snapshot mode.
+
+8. **Trends mode — analyze history**
+
+   ```bash
+   wc -l ~/.moltbloat/history.log 2>/dev/null
+   cat ~/.moltbloat/history.log 2>/dev/null
+   ```
+
+   If file doesn't exist or has < 2 entries:
+   > Not enough historical data yet. Run `/moltbloat:snapshot` periodically (weekly or monthly) to build a trend history.
+
+   Stop here if insufficient data.
+
+9. **Parse history and calculate trends**
+
+   Each line has the format:
+   ```
+   2026-04-03T15:30:00Z | plugins=20 skills=71 mcps=27 tokens=~37325 disk=967MB
+   ```
+
+   Extract metrics for trend analysis:
+   - Plugin count over time
+   - Token cost progression
+   - Disk usage growth
+
+   Calculate:
+   - Total change (absolute and percentage)
+   - Rate of change per month
+   - Period of fastest growth
+
+10. **Generate trend report**
+
+    ```
+    # Moltbloat Trends Report
+
+    **Analysis period**: <first date> to <last date>
+    **Snapshots available**: <count>
+
+    ## Summary
+
+    | Metric | Start | Current | Change | Rate/Month |
+    |--------|-------|---------|--------|------------|
+    | Plugins | X | Y | +/-Z | +/-N |
+    | Token Cost | X | Y | +/-Z | +/-N |
+    | Disk Usage | X MB | Y MB | +/-Z MB | +/-N MB |
+
+    ## Token Cost Trend
+
+    <ASCII sparkline showing progression>
+    Example:
+    ```
+    40K ┤        ╭────╮
+    35K ┤   ╭────╯    ╰────╮
+    30K ┤───╯                ╰─── Current
+        └────────────────────────
+          Jan  Feb  Mar  Apr
+    ```
+
+    **Analysis**:
+    - Token cost <increased/decreased> by X% since <first date>
+    - Fastest growth: <date range> (+X tokens)
+    - <if decreasing> Cleanup efforts are working — token cost down!
+    - <if increasing> Growing at ~X tokens/month — consider `/moltbloat:profile lean`
+
+    ## Recommendations
+
+    Based on trend analysis:
+    - <if growing> Your ecosystem is growing. Consider setting up profiles.
+    - <if stable> Good stability — well managed.
+    - <if shrinking> Excellent — you're keeping bloat down.
+    - "At current rate, you'll reach 50K tokens by <projected date>"
+
+    Run `/moltbloat:snapshot` regularly to maintain trend visibility.
+    ```
+
+11. **Done**
 
 </Steps>
