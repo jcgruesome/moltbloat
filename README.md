@@ -1,6 +1,21 @@
-# moltbloat
+<div align="center">
+
+```
+    ███╗   ███╗ ██████╗ ██╗     ████████╗██████╗ ██╗      ██████╗  █████╗ ████████╗
+    ████╗ ████║██╔═══██╗██║     ╚══██╔══╝██╔══██╗██║     ██╔═══██╗██╔══██╗╚══██╔══╝
+    ██╔████╔██║██║   ██║██║        ██║   ██████╔╝██║     ██║   ██║███████║   ██║   
+    ██║╚██╔╝██║██║   ██║██║        ██║   ██╔══██╗██║     ██║   ██║██╔══██║   ██║   
+    ██║ ╚═╝ ██║╚██████╔╝███████╗   ██║   ██████╔╝███████╗╚██████╔╝██║  ██║   ██║   
+    ╚═╝     ╚═╝ ╚═════╝ ╚══════╝   ╚═╝   ╚═════╝ ╚══════╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝   
+```
+
+**Audit your Claude Code ecosystem for bloat, redundancy, and token waste**
 
 [![CI](https://github.com/jcgruesome/moltbloat/actions/workflows/ci.yml/badge.svg)](https://github.com/jcgruesome/moltbloat/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Version](https://img.shields.io/badge/version-0.6.0-blue.svg)](https://github.com/jcgruesome/moltbloat/releases)
+
+</div>
 
 A Claude Code plugin that audits your ecosystem for bloat, redundancy, and token waste — with usage tracking, cost analysis, and ecosystem profiles.
 

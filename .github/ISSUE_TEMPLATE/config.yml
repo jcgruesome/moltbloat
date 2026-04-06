@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Troubleshooting Guide
+    url: https://github.com/jcgruesome/moltbloat/blob/main/TROUBLESHOOTING.md
+    about: Check common issues and solutions first
+  - name: Discussions
+    url: https://github.com/jcgruesome/moltbloat/discussions
+    about: Ask questions and share ideas
