@@ -20,12 +20,14 @@ claude plugin install moltbloat
 
 ### Core — audit, understand costs, clean up
 ```
-/moltbloat:help              # Show all available commands
-/moltbloat:audit             # Full scan with health score (0-100), includes compatibility
-/moltbloat:token-budget      # Context cost breakdown + dollar estimates
-/moltbloat:clean             # Interactive cleanup with confirmation
-/moltbloat:clean --dry-run   # Preview cleanup without making changes
-/moltbloat:doctor            # Self-diagnostic and health check
+/moltbloat:help                   # Show all available commands
+/moltbloat:audit                  # Full scan with health score (0-100), includes compatibility
+/moltbloat:audit --json           # Export audit as JSON for CI integration
+/moltbloat:audit --export <path>  # Save audit results to file
+/moltbloat:token-budget           # Context cost breakdown + dollar estimates
+/moltbloat:clean                  # Interactive cleanup with confirmation
+/moltbloat:clean --dry-run        # Preview cleanup without making changes
+/moltbloat:doctor                 # Self-diagnostic and health check
 ```
 
 ### Intelligence — understand your ecosystem
@@ -39,12 +41,14 @@ claude plugin install moltbloat
 ### Management — control your ecosystem
 ```
 /moltbloat:profile list            # See available profiles
+/moltbloat:profile suggest         # Intelligent optimization based on usage + audit
 /moltbloat:profile apply lean      # Switch to minimal config
 /moltbloat:profile auto            # Auto-generate profile from usage data
 /moltbloat:profile export <name>   # Share a profile as portable JSON
 /moltbloat:profile import <path>   # Import a shared profile
 /moltbloat:snapshot                # Save baseline, detect drift
 /moltbloat:snapshot trends         # Show historical trends
+/moltbloat:snapshot --export       # Export snapshot JSON
 /moltbloat:team-report             # Aggregate findings across team
 ```
 
@@ -63,10 +67,23 @@ Token-budget shows the actual dollar cost of your ecosystem overhead:
 - Per month
 
 ### Compatibility detection
-Finds plugin conflicts before they cause mysterious behavior: hook collisions, skill name shadowing, duplicate MCP tools.
+Finds plugin conflicts before they cause mysterious behavior: hook collisions, skill name shadowing, duplicate MCP tools. Smart duplicate detection identifies semantic overlaps (e.g., two Vercel deployment plugins) even with different names.
 
 ### Fully dynamic
 All checks are structural — no hardcoded plugin names or curated opinion lists. The audit detects redundancy by analyzing what's actually installed and where things overlap, not by maintaining a database of "X replaces Y." The ecosystem evolves fast; moltbloat keeps up automatically.
+
+### Usage-aware recommendations
+Cross-references audit findings with actual usage data. A plugin with zero usage that duplicates another plugin's functionality gets flagged as high priority for removal. Usage tracking is silent and automatic.
+
+### Smart cleanup
+The `profile suggest` command analyzes your ecosystem + usage + audit findings to recommend an optimized profile. One command can reduce your token overhead by 30-50%.
+
+### Configuration
+Customize thresholds, costs, and defaults in `~/.moltbloat/config.json`:
+- Token warning/critical thresholds
+- Auto-compact usage data
+- Ignored findings (false positives)
+- Cost rates for new models
 
 ## What it checks
 
@@ -79,6 +96,8 @@ All checks are structural — no hardcoded plugin names or curated opinion lists
 - **Stale configs**: orphaned sessions, old caches, dead project refs
 - **Token cost**: how much context each component consumes, in dollars
 - **Usage**: what's actually invoked vs just installed
+- **Semantic duplicates**: plugins with similar functionality (e.g., two Vercel plugins)
+- **Usage correlation**: zero-usage plugins flagged for priority removal
 
 ## Health Score
 
