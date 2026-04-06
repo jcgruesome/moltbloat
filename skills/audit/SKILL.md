@@ -35,7 +35,27 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    If not in JSON mode, tell the user:
    > Running full ecosystem audit on `~/.claude/`...
 
-3. **Load configuration and usage data**
+3. **Check dependencies and prerequisites**
+
+   Verify required tools are available:
+   ```bash
+   bash "${CLAUDE_PLUGIN_ROOT}/scripts/check-deps.sh" 2>/dev/null || true
+   ```
+
+   Check if Claude Code is initialized:
+   ```bash
+   if [ ! -d "$HOME/.claude" ]; then
+     echo "ERROR: Claude Code not found at ~/.claude"
+     echo "Please ensure Claude Code is installed and initialized."
+     exit 1
+   fi
+   
+   if [ ! -f "$HOME/.claude/plugins/installed_plugins.json" ]; then
+     echo "NOTE: No plugins installed yet. Audit will show empty ecosystem."
+   fi
+   ```
+
+4. **Load configuration and usage data**
 
    Load thresholds, scoring weights, and ignored findings from config:
    ```bash
