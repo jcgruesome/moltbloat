@@ -128,7 +128,41 @@ Show what's actually being used versus what's just sitting there consuming conte
    `claude_ai_<server>`, or bare `<server>`); match them to installed servers by server
    name, and use the `plugin` field to attribute plugin-owned servers.
 
-5. **Classify each installed item by recency tier**
+5. **Determine each plugin's measurable surface (CRITICAL — avoids false positives)**
+
+   The miner only sees things that emit a `tool_use` block: skills (via the `Skill`
+   tool), subagents (via `Task`), and MCP servers (via `mcp__*` calls). Many plugins
+   provide value through surfaces that **never** appear in tool history:
+
+   - statuslines, output styles
+   - LSP providers (`*-lsp` plugins)
+   - hooks-only plugins
+   - **slash commands** (`commands/*.md`) — typed as `/plugin:cmd`, not routed through
+     the `Skill` tool, so they leave no `tool_use` record
+
+   For each enabled plugin, inspect its install path for a **measurable surface** = at
+   least one `skills/*/SKILL.md`, one `agents/*.md`, or a `.mcp.json`:
+
+   ```bash
+   ip="<plugin installPath from installed_plugins.json>"
+   measurable=0
+   [ -n "$(find "$ip/skills" -name SKILL.md 2>/dev/null)" ] && measurable=1
+   [ -n "$(find "$ip/agents" -name '*.md' 2>/dev/null)" ] && measurable=1
+   [ -f "$ip/.mcp.json" ] && measurable=1
+   ```
+
+   **A plugin is OBSERVABLE if it has a measurable surface OR any mined history is
+   attributed to it.** (Slash commands sometimes *are* logged via the `Skill` tool — e.g.
+   `commit-commands:clean_gone` — so a commands-only plugin with real history is still
+   observable and must be tiered normally.)
+
+   Only when a plugin has **neither** a measurable surface **nor** any attributed history
+   (pure LSP, statusline, hooks-only, or a commands-only plugin never logged) mark it
+   **N/A — not observable** and **never** put it in the disable suggestions. Absence from
+   history is not evidence of disuse for these. Likewise, never report bare `commands/*`
+   files as "unused skills."
+
+6. **Classify each measurable item by recency tier**
 
    Read the staleness window from config (default 30 days):
 
@@ -136,16 +170,20 @@ Show what's actually being used versus what's just sitting there consuming conte
    stale_days=$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get thresholds.stale_days 2>/dev/null || echo 30)
    ```
 
-   For every installed skill, agent, and MCP server (and each plugin overall), assign:
+   For every installed skill, agent, and MCP server (and each observable plugin overall),
+   assign:
 
    - **NEVER** — absent from the mined `items` entirely → strong remove candidate.
    - **STALE** — present, but `last_used` is older than `stale_days` → review candidate.
    - **ACTIVE** — `last_used` is within `stale_days` → keep.
 
-   A **plugin** is NEVER-used only if *none* of its skills, agents, or MCP servers appear
-   in history; STALE if its most recent contribution is older than `stale_days`.
+   A **plugin** is NEVER-used only if it has a measurable surface AND *none* of its
+   skills, agents, or MCP servers appear in history; STALE if its most recent
+   contribution is older than `stale_days`. A plugin's MCP server may be NEVER-used even
+   while you actively use a same-named integration from a different source (e.g. a
+   claude.ai connector) — that is a legitimate redundancy finding, not a false positive.
 
-6. **Generate the report**
+7. **Generate the report**
 
    ```
    # Moltbloat Usage Report
@@ -183,7 +221,16 @@ Show what's actually being used versus what's just sitting there consuming conte
    **Skills (X never used):** <list, grouped by source plugin>
    **Agents (X never used):** <list>
    **MCP servers (X never called):** <list>
-   **Plugins fully idle (no skill/agent/mcp ever used):** <list>
+   **Plugins fully idle (measurable surface, no skill/agent/mcp ever used):** <list>
+
+   ## Not Observable From History (review manually — NOT flagged as bloat)
+
+   These provide value through surfaces the miner can't see (slash commands, LSP,
+   statuslines, hooks). Their absence from history is NOT evidence of disuse:
+
+   | Plugin | Surface |
+   |--------|---------|
+   | <name> | commands-only / LSP / statusline / hooks-only |
 
    ## The Bottom Line
 
@@ -197,9 +244,10 @@ Show what's actually being used versus what's just sitting there consuming conte
 
    ## Suggested Disable Commands (review before running — moltbloat never runs these)
 
-   <For each NEVER/STALE item, print the exact action from the mapping below.>
+   <For each NEVER/STALE item with a measurable surface, print the exact action from the
+   mapping below. NEVER include plugins from the "Not Observable" section.>
 
-   # Fully-idle plugins (no component ever used):
+   # Fully-idle plugins (measurable surface, no component ever used):
    claude plugin disable <plugin>        # frees its skills, agents, and MCP servers
 
    # Idle MCP servers owned by an otherwise-active plugin:
@@ -222,11 +270,13 @@ Show what's actually being used versus what's just sitting there consuming conte
    ```
 
    **Granularity honesty:** never present a disable command that would remove a still-used
-   component. Only suggest `claude plugin disable <plugin>` when *every* skill, agent, and
-   MCP server from that plugin is NEVER or STALE. For an idle server inside an active
-   plugin, recommend disconnecting the server, not disabling the plugin.
+   component, and never suggest disabling a plugin from the "Not Observable" section
+   (commands-only, LSP, statusline, hooks-only) — usage history cannot judge it. Only
+   suggest `claude plugin disable <plugin>` when the plugin has a measurable surface and
+   *every* skill, agent, and MCP server it provides is NEVER or STALE. For an idle server
+   inside an active plugin, recommend disconnecting the server, not disabling the plugin.
 
-7. **Compact old usage data (auto or manual)**
+8. **Compact old usage data (auto or manual)**
 
    Check if the usage file has grown large enough to benefit from compaction:
    ```bash
@@ -250,14 +300,14 @@ Show what's actually being used versus what's just sitting there consuming conte
 
    **Compaction process:**
 
-   **7a.** Read all entries, split into recent (last 30 days) and old.
+   **8a.** Read all entries, split into recent (last 30 days) and old.
 
-   **7b.** Aggregate old entries into daily summaries:
+   **8b.** Aggregate old entries into daily summaries:
    ```json
    {"date":"<date>","type":"summary","skills":{"<name>":<count>},"agents":{"<name>":<count>},"mcps":{"<name>":<count>},"tools":{"<name>":<count>},"total":<count>}
    ```
 
-   **7c.** Write compacted file:
+   **8c.** Write compacted file:
    ```bash
    # Back up first
    cp ~/.moltbloat/usage.jsonl ~/.moltbloat/usage.jsonl.bak
@@ -267,7 +317,7 @@ Show what's actually being used versus what's just sitting there consuming conte
    mv ~/.moltbloat/usage.jsonl.new ~/.moltbloat/usage.jsonl
    ```
 
-   **7d.** Report:
+   **8d.** Report:
    ```
    Compacted: <old_count> raw entries → <summary_count> daily summaries
    Kept: <recent_count> recent entries (last 30 days)
@@ -277,7 +327,7 @@ Show what's actually being used versus what's just sitting there consuming conte
 
    If auto_compact is disabled and user declines, skip silently.
 
-8. **Done**
+9. **Done**
 
    Native history keeps growing as you work — run again later for updated insights.
 

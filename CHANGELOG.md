@@ -53,6 +53,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic data compaction for usage logs >5,000 lines
 - Read-only by default (only clean/profile modify state)
 
+## [0.7.1] - 2026-06-19
+
+### Fixed
+- **No more false-positive disable suggestions in `/moltbloat:usage`.** Plugins that provide value through surfaces the miner can't see — LSP providers (`*-lsp`), statuslines, hooks-only, and command-only plugins — were wrongly flagged as "never used" and recommended for disabling. The skill now computes an **observability** check: a plugin is judged from history only if it has a measurable surface (skill/agent/MCP) OR has any history attributed to it. Unobservable plugins are listed under a new "Not Observable From History (review manually)" section and never appear in disable suggestions.
+- Slash commands that *are* logged via the `Skill` tool (e.g. `commit-commands:clean_gone`) are now correctly tiered by recency instead of being misclassified.
+
 ## [0.7.0] - 2026-06-19
 
 ### Added
