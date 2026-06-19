@@ -13,7 +13,7 @@
 
 [![CI](https://github.com/jcgruesome/moltbloat/actions/workflows/ci.yml/badge.svg)](https://github.com/jcgruesome/moltbloat/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-0.6.1-blue.svg)](https://github.com/jcgruesome/moltbloat/releases)
+[![Version](https://img.shields.io/badge/version-0.7.0-blue.svg)](https://github.com/jcgruesome/moltbloat/releases)
 
 </div>
 
@@ -50,7 +50,7 @@ claude plugin install moltbloat
 /moltbloat:changelog      # Diff ecosystem against last snapshot
 /moltbloat:depends        # Dependency graph + blast radius
 /moltbloat:why <plugin>   # Quick "should I keep this?" card
-/moltbloat:usage          # What you actually use vs what's installed
+/moltbloat:usage          # What you actually use vs installed — mined from native history
 ```
 
 ### Management — control your ecosystem
@@ -69,8 +69,8 @@ claude plugin install moltbloat
 
 ## What makes this different
 
-### Usage tracking
-A silent PostToolUse hook logs every skill, agent, and MCP invocation. After a few sessions, `/moltbloat:usage` tells you exactly what you use vs what's just consuming context. No more guessing.
+### Usage tracking (retroactive)
+`/moltbloat:usage` mines Claude Code's own session transcripts (`~/.claude/projects/`) to show exactly what you use vs what's just consuming context — **immediately, from your first run**, no waiting for data to accumulate. Every component is tiered by recency (**active** / **stale** / **never used**), and never-used MCPs, plugins, and agents come with the exact disable command. A silent PostToolUse hook supplements this with forward-looking corroboration.
 
 ### Ecosystem profiles
 Switch between `lean` (2-3 plugins, ~5K tokens) and `full` (everything, ~40K+ tokens) with one command. Or create custom profiles for frontend, backend, or project-specific work.

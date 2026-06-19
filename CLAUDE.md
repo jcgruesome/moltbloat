@@ -19,7 +19,7 @@ Run `/moltbloat:help` for the full command reference.
 - `/moltbloat:changelog` — Diff current ecosystem against your last snapshot to see what changed
 - `/moltbloat:depends` — Dependency graph showing what each plugin provides and blast radius of removal
 - `/moltbloat:why <plugin>` — Quick lookup: what does this plugin give me, overlaps, token cost, keep/remove verdict
-- `/moltbloat:usage` — What you actually use vs what's installed (requires tracking data)
+- `/moltbloat:usage` — What you actually use vs what's installed, mined retroactively from Claude Code's native session history, with recency tiers (active/stale/never) and disable suggestions
 
 ### Management
 - `/moltbloat:profile` — Switch between ecosystem configs (lean/full/frontend/backend/custom)
@@ -35,7 +35,8 @@ Run `/moltbloat:help` for the full command reference.
 
 ## Data Files
 
-- `~/.moltbloat/usage.jsonl` — Usage tracking data (created automatically by PostToolUse hook)
+- `~/.claude/projects/**/*.jsonl` — Claude Code's native session transcripts. Read-only by moltbloat; the **primary** usage source mined by `scripts/parse-history.py` for `/moltbloat:usage`.
+- `~/.moltbloat/usage.jsonl` — Usage tracking data (created automatically by PostToolUse hook; supplements native history)
 - `~/.moltbloat/usage.jsonl.bak` — Backup created before usage compaction
 - `~/.moltbloat/baseline.json` — Ecosystem snapshot (created by `/moltbloat:snapshot`)
 - `~/.moltbloat/history.log` — One-line snapshot summaries over time (appended by `/moltbloat:snapshot`)

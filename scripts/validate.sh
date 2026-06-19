@@ -122,6 +122,24 @@ else
   ((ERRORS++))
 fi
 
+if python3 -m py_compile "$PLUGIN_ROOT/scripts/parse-history.py" 2>/dev/null; then
+  echo "  ✓ parse-history.py: syntax valid"
+else
+  echo "  ✗ parse-history.py: syntax errors"
+  ((ERRORS++))
+fi
+
+echo ""
+echo "Running unit tests..."
+
+# parse-history miner — deterministic fixture-based test
+if python3 "$PLUGIN_ROOT/scripts/test-parse-history.py" >/dev/null 2>&1; then
+  echo "  ✓ test-parse-history.py: all assertions pass"
+else
+  echo "  ✗ test-parse-history.py: FAILED"
+  ((ERRORS++))
+fi
+
 echo ""
 echo "Checking for duplicates..."
 
