@@ -13,7 +13,7 @@ Run `/moltbloat:help` for the full command reference.
 - `/moltbloat:token-budget` — Context window cost analysis with dollar estimates (Opus/Sonnet/Haiku)
 - `/moltbloat:clean` — Interactive cleanup with confirmation before each action
 - `/moltbloat:clean --dry-run` — Preview cleanup actions without making changes
-- `/moltbloat:doctor` — Self-diagnostic for installation health and dependencies
+- `/moltbloat:diagnose` — Self-diagnostic for installation health and dependencies
 
 ### Intelligence
 - `/moltbloat:changelog` — Diff current ecosystem against your last snapshot to see what changed

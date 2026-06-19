@@ -13,7 +13,7 @@
 
 [![CI](https://github.com/jcgruesome/moltbloat/actions/workflows/ci.yml/badge.svg)](https://github.com/jcgruesome/moltbloat/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-0.6.0-blue.svg)](https://github.com/jcgruesome/moltbloat/releases)
+[![Version](https://img.shields.io/badge/version-0.6.1-blue.svg)](https://github.com/jcgruesome/moltbloat/releases)
 
 </div>
 
@@ -42,7 +42,7 @@ claude plugin install moltbloat
 /moltbloat:token-budget           # Context cost breakdown + dollar estimates
 /moltbloat:clean                  # Interactive cleanup with confirmation
 /moltbloat:clean --dry-run        # Preview cleanup without making changes
-/moltbloat:doctor                 # Self-diagnostic and health check
+/moltbloat:diagnose               # Self-diagnostic and health check
 ```
 
 ### Intelligence — understand your ecosystem

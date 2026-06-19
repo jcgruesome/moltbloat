@@ -53,7 +53,7 @@ Display all available moltbloat commands with brief descriptions so the user kno
    ## System
    | Command | Description |
    |---------|-------------|
-   | `/moltbloat:doctor` | Self-diagnostic — check installation health, dependencies, and data integrity |
+   | `/moltbloat:diagnose` | Self-diagnostic — check moltbloat installation health, dependencies, and data integrity |
 
    ## Team
    | Command | Description |
@@ -67,7 +67,7 @@ Display all available moltbloat commands with brief descriptions so the user kno
    3. Run `/moltbloat:clean` to remove bloat
    4. Run `/moltbloat:snapshot` to save clean state
 
-   **Tip:** Run `/moltbloat:doctor` if you encounter any issues.
+   **Tip:** Run `/moltbloat:diagnose` if you encounter any issues.
 
    **Configuration:**
    Edit `~/.moltbloat/config.json` to customize thresholds and defaults.

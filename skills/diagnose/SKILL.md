@@ -1,6 +1,6 @@
 ---
-name: doctor
-description: Self-diagnostic for moltbloat — check installation health, dependencies, permissions, and data integrity
+name: diagnose
+description: Self-diagnostic for the moltbloat plugin — check moltbloat's installation health, dependencies, permissions, and data integrity. Not a general Claude Code diagnostic; for that, use Claude Code's built-in /doctor command.
 level: 1
 ---
 
@@ -9,13 +9,15 @@ Run a comprehensive self-diagnostic on the moltbloat installation and its enviro
 </Purpose>
 
 <Use_When>
-- User says "doctor", "diagnose", "why isn't moltbloat working", "check installation"
-- Moltbloat commands are failing or behaving unexpectedly
+- User explicitly runs `/moltbloat:diagnose`
+- User says "why isn't moltbloat working" or "check the moltbloat installation"
+- A moltbloat command is failing or behaving unexpectedly
 - After installing moltbloat for the first time to verify setup
-- Before reporting a bug — run this first
+- Before reporting a moltbloat bug — run this first
 </Use_When>
 
 <Do_Not_Use_When>
+- User runs Claude Code's built-in `/doctor` or says a bare "doctor"/"diagnose" — that targets Claude Code itself, not moltbloat. Do not hijack it.
 - User wants to audit their ecosystem — use `/moltbloat:audit`
 - User wants general Claude Code troubleshooting — this is specifically for moltbloat
 </Do_Not_Use_When>
@@ -135,7 +137,7 @@ Run a comprehensive self-diagnostic on the moltbloat installation and its enviro
 
    ```bash
    # Test writing to moltbloat directory
-   testfile="$HOME/.moltbloat/.doctor_test_$$"
+   testfile="$HOME/.moltbloat/.diagnose_test_$$"
    if echo "test" > "$testfile" 2>/dev/null; then
      rm "$testfile"
      echo "Write test: PASSED"
@@ -183,7 +185,7 @@ except:
 9. **Generate diagnostic report**
 
    ```
-   # Moltbloat Doctor Report
+   # Moltbloat Diagnostic Report
 
    ## System Environment
    - Python: <version> <✅/❌>
