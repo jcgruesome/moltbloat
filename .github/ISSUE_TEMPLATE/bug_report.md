@@ -17,8 +17,8 @@ Steps to reproduce the behavior:
 **Expected behavior**
 A clear and concise description of what you expected to happen.
 
-**Output of `/moltbloat:doctor`**
-Please run the doctor command and paste the output:
+**Output of `/moltbloat:diagnose`**
+Please run the diagnose command and paste the output:
 ```
 [paste output here]
 ```
@@ -33,6 +33,6 @@ Please run the doctor command and paste the output:
 Add any other context about the problem here.
 
 **Checklist**
-- [ ] I ran `/moltbloat:doctor` before reporting
+- [ ] I ran `/moltbloat:diagnose` before reporting
 - [ ] I checked [TROUBLESHOOTING.md](../TROUBLESHOOTING.md)
 - [ ] I can reproduce this consistently

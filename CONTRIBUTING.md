@@ -95,7 +95,7 @@ Current skills (as of v0.5.0):
 2. `changelog` — Diff against baseline
 3. `clean` — Interactive cleanup (with `--dry-run`)
 4. `depends` — Dependency graph
-5. `doctor` — Self-diagnostic
+5. `diagnose` — Self-diagnostic
 6. `help` — Command reference
 7. `profile` — Profile management
 8. `snapshot` — Baseline + trends

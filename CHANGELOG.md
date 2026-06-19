@@ -53,6 +53,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic data compaction for usage logs >5,000 lines
 - Read-only by default (only clean/profile modify state)
 
+## [0.6.1] - 2026-06-18
+
+### Changed
+- **RENAMED: `/moltbloat:doctor` → `/moltbloat:diagnose`** — The `doctor` skill collided with Claude Code's built-in `/doctor` command. Its generic "doctor"/"diagnose" trigger words caused the plugin's self-diagnostic to hijack the built-in diagnostic. The skill is renamed and its triggers scoped to moltbloat-specific phrases only.
+
 ## [0.6.0] - TBD
 
 ### Added

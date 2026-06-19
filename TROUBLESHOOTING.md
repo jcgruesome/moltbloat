@@ -231,7 +231,7 @@ If none of these fix your issue:
 
 1. **Run diagnostics:**
    ```
-   /moltbloat:doctor
+   /moltbloat:diagnose
    ```
 
 2. **Check validation:**
@@ -241,7 +241,7 @@ If none of these fix your issue:
    ```
 
 3. **Open an issue** on GitHub with:
-   - Output of `/moltbloat:doctor`
+   - Output of `/moltbloat:diagnose`
    - Claude Code version: `claude --version`
    - OS version
    - Steps to reproduce
