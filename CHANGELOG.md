@@ -53,6 +53,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic data compaction for usage logs >5,000 lines
 - Read-only by default (only clean/profile modify state)
 
+## [0.7.0] - 2026-06-19
+
+### Added
+- **Retroactive usage mining** — `/moltbloat:usage` now mines Claude Code's native session transcripts (`~/.claude/projects/**/*.jsonl`) as its primary data source, so it works immediately on the first run instead of waiting weeks for the hook log to accumulate.
+- **`scripts/parse-history.py`** — streaming transcript miner that aggregates real tool, MCP server, skill, and subagent usage with per-item `count`, `first_used`, `last_used`, and `sessions`. Flags: `--since <days>`, `--json`. Fails fast if `~/.claude/projects` is missing.
+- **Recency tiers** — every installed component is classified **ACTIVE** / **STALE** / **NEVER** against a configurable window (`thresholds.stale_days`, default 30), turning "unused" into a defensible, recency-aware verdict.
+- **Disable suggestions** — never/stale MCPs, plugins, and agents are reported with the exact disable/disconnect command (read-only; moltbloat never runs them), with granularity safeguards so a still-used component is never recommended for removal.
+- **`scripts/test-parse-history.py`** — fixture-based unit tests for the miner, wired into `scripts/validate.sh`.
+
+### Changed
+- **Config schema v1.2** — added `thresholds.stale_days` (default 30).
+- moltbloat's own PostToolUse hook log (`usage.jsonl`) is now supplemental corroboration rather than the sole source.
+
 ## [0.6.1] - 2026-06-18
 
 ### Changed

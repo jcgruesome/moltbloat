@@ -6,7 +6,7 @@ import sys
 from datetime import datetime, timezone
 
 CONFIG_PATH = os.path.expanduser("~/.moltbloat/config.json")
-CONFIG_VERSION = "1.1"
+CONFIG_VERSION = "1.2"
 
 DEFAULT_CONFIG = {
     "version": CONFIG_VERSION,
@@ -18,7 +18,8 @@ DEFAULT_CONFIG = {
         "disk_critical_mb": 1000,
         "snapshot_stale_days": 30,
         "baseline_max_age_days": 90,
-        "usage_compact_lines": 5000
+        "usage_compact_lines": 5000,
+        "stale_days": 30
     },
     "costs": {
         "opus_per_1m_tokens": 15.00,
