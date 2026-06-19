@@ -5,7 +5,7 @@
   },
   "metadata": {
     "description": "Audit your Claude Code ecosystem for bloat, redundancy, and token waste",
-    "version": "0.7.0"
+    "version": "0.7.1"
   },
   "plugins": [
     {
