@@ -29,6 +29,7 @@ Display all available moltbloat commands with brief descriptions so the user kno
    | `/moltbloat:audit` | Full ecosystem scan — finds redundancy, collisions, conflicts, staleness, and scores health (0-100) |
    | `/moltbloat:audit --json` | Export audit results as JSON for CI integration |
    | `/moltbloat:audit --export <path>` | Save audit results to file |
+   | `/moltbloat:audit --deep` | Multi-agent forensic audit: scoped auditors, adversarial verification of high findings, token-waste ledger, shareable report artifact (token-intensive; asks before running) |
    | `/moltbloat:token-budget` | Context window cost analysis — shows what each plugin costs in tokens and dollars |
    | `/moltbloat:usage` | What you actually use vs what's installed, hook overhead, data compaction (auto-compact configurable) |
 

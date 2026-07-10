@@ -10,6 +10,7 @@ Run `/moltbloat:help` for the full command reference.
 - `/moltbloat:help` — Show all available commands
 - `/moltbloat:audit` — Full ecosystem scan with severity-rated findings, health score (0-100), compatibility checking, and usage-based recommendations
 - `/moltbloat:audit --json` — Export audit results as JSON for CI integration
+- `/moltbloat:audit --deep` — Multi-agent forensic audit (7 scoped auditors → adversarial verification → ideation) producing a token-waste ledger and a polished shareable report artifact; recon via `scripts/deep-recon.py`, orchestration via `scripts/deep-audit-workflow.js`, template in `skills/audit/report-template.html`
 - `/moltbloat:token-budget` — Context window cost analysis with dollar estimates (Opus/Sonnet/Haiku)
 - `/moltbloat:clean` — Interactive cleanup with confirmation before each action
 - `/moltbloat:clean --dry-run` — Preview cleanup actions without making changes

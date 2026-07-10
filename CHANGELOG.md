@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-07-10
+
+### Added
+- **`/moltbloat:audit --deep`** — multi-agent forensic audit mode. Fans out 7 scoped
+  auditors (instruction files, rules, settings, MCP/plugins, skills/commands,
+  hooks/hygiene, memory systems), adversarially verifies every high-severity finding
+  with independent agents, runs improvement-ideation lenses, and assembles a polished
+  shareable HTML report with a per-session token-waste ledger and a phased cleanup plan.
+  Flags: `--thorough` (3 verify votes + radical-rethink lens), `--no-ideas`, `--yes`.
+- `scripts/deep-recon.py` — deterministic, read-only ground-truth gatherer (sizes,
+  injected-file inventory, phantom references, duplicate MCP servers, one-off
+  permission suspects, usage rankings). Stdlib only; works on any `CLAUDE_CONFIG_DIR`.
+- `scripts/deep-audit-workflow.js` — canonical Workflow-tool orchestration script,
+  parameterized by recon facts; degrades to parallel subagents or single-context when
+  Workflow/subagents are unavailable (procedure in `skills/audit/deep-audit.md`).
+- `skills/audit/report-template.html` — theme-aware report artifact template
+  (waste ledger, severity-striped verified findings, ideas, phased plan).
+
 ## [0.5.0] - 2026-04-04
 
 ### Added

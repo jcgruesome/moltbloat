@@ -1,6 +1,6 @@
 ---
 name: audit
-description: Full ecosystem audit with compatibility checking — scans plugins, MCPs, skills, agents, rules, and configs for bloat, redundancy, staleness, and conflicts
+description: Full ecosystem audit with compatibility checking — scans plugins, MCPs, skills, agents, rules, and configs for bloat, redundancy, staleness, and conflicts. Use --deep for a multi-agent forensic audit with adversarially verified findings and a shareable report artifact
 level: 3
 ---
 
@@ -29,6 +29,12 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    - `/moltbloat:audit` — standard text report
    - `/moltbloat:audit --json` — machine-readable JSON output
    - `/moltbloat:audit --export <path>` — save JSON to file
+   - `/moltbloat:audit --deep [--thorough] [--no-ideas] [--yes]` — multi-agent
+     forensic audit with adversarial verification and a polished report artifact.
+     **This mode is a different procedure entirely: STOP here and follow
+     `deep-audit.md` in this skill's directory instead of the steps below.**
+     It spawns 10-30 subagents and can consume 1-3M tokens — `deep-audit.md`
+     step 1 requires explicit user confirmation unless `--yes` was passed.
 
 2. **Announce the audit**
 

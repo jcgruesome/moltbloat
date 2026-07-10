@@ -13,7 +13,7 @@
 
 [![CI](https://github.com/jcgruesome/moltbloat/actions/workflows/ci.yml/badge.svg)](https://github.com/jcgruesome/moltbloat/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-0.7.1-blue.svg)](https://github.com/jcgruesome/moltbloat/releases)
+[![Version](https://img.shields.io/badge/version-0.8.0-blue.svg)](https://github.com/jcgruesome/moltbloat/releases)
 
 </div>
 
@@ -39,6 +39,7 @@ claude plugin install moltbloat
 /moltbloat:audit                  # Full scan with health score (0-100), includes compatibility
 /moltbloat:audit --json           # Export audit as JSON for CI integration
 /moltbloat:audit --export <path>  # Save audit results to file
+/moltbloat:audit --deep           # Multi-agent forensic audit -> verified findings + report artifact
 /moltbloat:token-budget           # Context cost breakdown + dollar estimates
 /moltbloat:clean                  # Interactive cleanup with confirmation
 /moltbloat:clean --dry-run        # Preview cleanup without making changes
