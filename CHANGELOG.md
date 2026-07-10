@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1] - 2026-07-10
+
+### Fixed
+- **Usage tracker silently logged every invocation as `"unknown"`** — `track-usage.sh`
+  read tool name/input from env vars (`CLAUDE_TOOL_NAME`/`CLAUDE_TOOL_INPUT`) that
+  Claude Code never sets; the PostToolUse hook payload arrives as JSON on stdin.
+  Rewrote the script to parse stdin directly, with atomic file-locked writes and
+  errors routed to `~/.moltbloat/errors.log` instead of failing silently. This had
+  been degrading `/moltbloat:usage` data since the hook was introduced.
+
 ## [0.8.0] - 2026-07-10
 
 ### Added

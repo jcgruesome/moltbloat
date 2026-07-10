@@ -1,6 +1,6 @@
 #!/bin/bash
 # Lightweight usage tracker — logs tool/skill/agent invocations to ~/.moltbloat/usage.jsonl
-# Called by PostToolUse hook. Receives tool name and target via env vars.
+# Called by PostToolUse hook. Receives the hook payload (tool_name, tool_input, ...) as JSON on stdin.
 # Typically completes in under 50ms; hard timeout of 2 seconds set in hooks.json.
 
 set -e
@@ -8,7 +8,6 @@ set -e
 USAGE_DIR="$HOME/.moltbloat"
 USAGE_FILE="$USAGE_DIR/usage.jsonl"
 ERROR_LOG="$USAGE_DIR/errors.log"
-LOCK_FILE="$USAGE_DIR/usage.lock"
 
 # Ensure directory exists
 mkdir -p "$USAGE_DIR" 2>/dev/null || {
@@ -16,99 +15,77 @@ mkdir -p "$USAGE_DIR" 2>/dev/null || {
     exit 1
 }
 
-# Function to log errors
-log_error() {
-    local msg="[$(date -u +"%Y-%m-%dT%H:%M:%SZ")] $1"
-    echo "$msg" >> "$ERROR_LOG" 2>/dev/null || true
+export MOLTBLOAT_USAGE_FILE="$USAGE_FILE"
+export MOLTBLOAT_ERROR_LOG="$ERROR_LOG"
+
+PYSCRIPT=$(cat <<'PYEOF'
+import sys, json, fcntl, re, time, os
+
+usage_file = os.environ["MOLTBLOAT_USAGE_FILE"]
+error_log = os.environ["MOLTBLOAT_ERROR_LOG"]
+
+def log_error(msg):
+    try:
+        with open(error_log, "a") as f:
+            f.write("[" + time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()) + "] " + msg + "\n")
+    except Exception:
+        pass
+
+try:
+    payload = json.load(sys.stdin)
+except Exception as e:
+    log_error("Failed to parse stdin JSON: " + str(e))
+    sys.exit(1)
+
+tool_name = payload.get("tool_name") or "unknown"
+tool_input = payload.get("tool_input") or {}
+if not isinstance(tool_input, dict):
+    tool_input = {}
+
+ts = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+date = time.strftime("%Y-%m-%d", time.gmtime())
+
+typ = "tool"
+name = tool_name
+
+if tool_name in ("Skill", "skill"):
+    typ = "skill"
+    name = tool_input.get("skill") or "unknown-skill"
+elif tool_name in ("Agent", "agent"):
+    typ = "agent"
+    name = tool_input.get("subagent_type") or "general-purpose"
+elif tool_name.startswith("mcp__plugin_"):
+    typ = "mcp"
+    # mcp__plugin_<pluginname>_<serverkey>__<tool> -> <pluginname>
+    rest = tool_name[len("mcp__plugin_"):]
+    name = re.sub(r"_[^_]*__.*$", "", rest)
+elif tool_name.startswith("mcp__"):
+    typ = "mcp"
+    # mcp__<server>__<tool> -> <server>
+    name = tool_name[len("mcp__"):].split("__", 1)[0]
+
+def clean(s, n):
+    return "".join(c for c in str(s) if c not in "\n\r\t\"\\")[:n]
+
+entry = {
+    "ts": ts,
+    "date": date,
+    "type": typ,
+    "name": clean(name, 100),
+    "tool": clean(tool_name, 200),
 }
 
-# Function to acquire lock (with timeout)
-acquire_lock() {
-    local timeout=5
-    local elapsed=0
-    while [ -f "$LOCK_FILE" ] && [ $elapsed -lt $timeout ]; do
-        sleep 0.1
-        elapsed=$((elapsed + 1))
-    done
-    
-    if [ -f "$LOCK_FILE" ]; then
-        log_error "Lock timeout, stale lock file exists"
-        rm -f "$LOCK_FILE" 2>/dev/null || true
-    fi
-    
-    touch "$LOCK_FILE" 2>/dev/null || {
-        log_error "Cannot create lock file"
-        exit 1
-    }
-}
+try:
+    with open(usage_file, "a") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        f.write(json.dumps(entry) + "\n")
+        fcntl.flock(f, fcntl.LOCK_UN)
+except Exception as e:
+    log_error("Failed to write to " + usage_file + ": " + str(e))
+    sys.exit(1)
+PYEOF
+)
 
-# Function to release lock
-release_lock() {
-    rm -f "$LOCK_FILE" 2>/dev/null || true
-}
-
-# Trap to ensure lock is always released
-trap release_lock EXIT
-
-# Acquire lock
-acquire_lock
-
-# Extract tool info from environment
-TOOL_NAME="${CLAUDE_TOOL_NAME:-unknown}"
-TOOL_INPUT="${CLAUDE_TOOL_INPUT:-}"
-TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo "unknown")
-DATE=$(date -u +"%Y-%m-%d" 2>/dev/null || echo "unknown")
-
-# Sanitize inputs (remove newlines and control chars to prevent JSON corruption)
-TOOL_NAME=$(echo "$TOOL_NAME" | tr -d '\n\r\t' | head -c 200)
-
-# Classify the invocation
-TYPE="tool"
-NAME="$TOOL_NAME"
-
-case "$TOOL_NAME" in
-  Skill|skill)
-    TYPE="skill"
-    # Extract skill name from input (handle optional whitespace in JSON)
-    NAME=$(echo "$TOOL_INPUT" | grep -oE '"skill"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*:[[:space:]]*"\([^"]*\)".*/\1/')
-    [ -z "$NAME" ] && NAME="unknown-skill"
-    ;;
-  Agent|agent)
-    TYPE="agent"
-    NAME=$(echo "$TOOL_INPUT" | grep -oE '"subagent_type"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*:[[:space:]]*"\([^"]*\)".*/\1/')
-    [ -z "$NAME" ] && NAME="general-purpose"
-    ;;
-  mcp__plugin_*)
-    TYPE="mcp"
-    # Plugin MCP: mcp__plugin_oh-my-claudecode_t__tool -> oh-my-claudecode
-    NAME=$(echo "$TOOL_NAME" | sed 's/^mcp__plugin_//' | sed 's/_[^_]*__.*$//')
-    ;;
-  mcp__*)
-    TYPE="mcp"
-    # Direct MCP: mcp__figma-console__tool -> figma-console
-    NAME=$(echo "$TOOL_NAME" | sed 's/^mcp__//' | sed 's/__.*//')
-    ;;
-esac
-
-# Sanitize name
-NAME=$(echo "$NAME" | tr -d '\n\r\t"\\' | head -c 100)
-
-# Build JSON entry
-JSON_ENTRY="{\"ts\":\"$TIMESTAMP\",\"date\":\"$DATE\",\"type\":\"$TYPE\",\"name\":\"$NAME\",\"tool\":\"$TOOL_NAME\"}"
-
-# Validate JSON (basic check)
-if ! echo "$JSON_ENTRY" | python3 -c "import sys,json; json.load(sys.stdin)" 2>/dev/null; then
-    log_error "Invalid JSON generated: $JSON_ENTRY"
-    exit 1
-fi
-
-# Append to usage log (atomic write)
-if ! echo "$JSON_ENTRY" >> "$USAGE_FILE" 2>/dev/null; then
-    log_error "Failed to write to $USAGE_FILE"
-    exit 1
-fi
-
-# Release lock (trap handles this, but be explicit)
-release_lock
+python3 -c "$PYSCRIPT"
 
 exit 0
