@@ -1,25 +1,16 @@
 #!/usr/bin/env python3
-"""deep-recon: deterministic fact-gathering for /moltbloat:audit --deep.
+"""deep-recon: deterministic read-only fact-gathering for /moltbloat:audit --deep.
 
-Emits a FACTS document (markdown to stdout, or JSON with --json) describing a
-Claude Code config surface. This is the shared ground-truth handed to every
-deep-audit subagent so they investigate instead of re-deriving inventory.
-
-Read-only. Stdlib only. Usage:
-    deep-recon.py [CONFIG_DIR] [--json]
-CONFIG_DIR defaults to $CLAUDE_CONFIG_DIR, then ~/.claude. The state file
-(.claude.json) is looked up in $HOME, then as a sibling inside CONFIG_DIR
-(fixture layouts).
+Emits a FACTS document (markdown, or JSON with --json) — the shared ground truth
+handed to every deep-audit subagent. Stdlib only.
+Usage: deep-recon.py [CONFIG_DIR] [--json]; CONFIG_DIR defaults to $CLAUDE_CONFIG_DIR
+then ~/.claude. State file (.claude.json) found in $HOME or inside CONFIG_DIR (fixtures).
 """
 import json
 import os
 import re
 import subprocess
 import sys
-
-# The audit must fail fast and loud per-section, but one broken section must
-# not kill the rest of recon — each collector reports its own error string.
-
 
 def run(argv):
     """Run a command without a shell (paths are user input — no injection surface)."""

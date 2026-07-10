@@ -1,18 +1,9 @@
 // deep-audit-workflow.js — canonical Workflow script for /moltbloat:audit --deep.
-//
-// Launch via the Workflow tool with args:
-//   {
-//     factsPath:  "/abs/path/to/recon-facts.md",   // output of scripts/deep-recon.py (required)
-//     configDir:  "/abs/path/to/.claude",           // audited config dir (required)
-//     depth:      "standard" | "thorough",          // thorough = more verify votes + 3rd ideation lens
-//     ideation:   true | false                      // default true
-//   }
-// Returns { audits, ideas, stats } — the caller assembles the report artifact
-// from this JSON using skills/audit/report-template.html.
-//
-// This script contains NO user-specific facts: all ground truth comes from the
-// recon FACTS file, which every agent Reads itself.
-
+// Launch via the Workflow tool. args: { factsPath (recon output, required),
+// configDir (required), depth: 'standard'|'thorough', ideation: bool (default true) }.
+// Returns { audits, ideas, stats }; the caller assembles the report artifact from
+// skills/audit/report-template.html. No user-specific facts live here — all ground
+// truth comes from the recon FACTS file, which every agent Reads itself.
 export const meta = {
   name: 'moltbloat-deep-audit',
   description: 'Multi-agent forensic audit of a Claude Code config: 7 scoped auditors, adversarial verification, ideation',
