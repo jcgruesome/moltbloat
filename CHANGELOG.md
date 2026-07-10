@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.2] - 2026-07-10
+
+### Fixed
+- **Every Stop hook invocation failed with "Hook script appears to be missing"** —
+  `hooks/hooks.json` wrapped `${CLAUDE_PLUGIN_ROOT}` in single quotes, which in bash
+  disables variable expansion entirely. The env var was passed to `python3`/`bash` as
+  a literal, unexpanded string, so `check-snapshot-age.py` and `track-usage.sh` could
+  never be found — this had been broken since the hook was introduced in v0.3.0.
+  Switched to double quotes so bash actually expands the path.
+
 ## [0.8.1] - 2026-07-10
 
 ### Fixed
