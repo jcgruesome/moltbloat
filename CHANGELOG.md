@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-07-10
+
+### Added
+- **`/moltbloat:audit --deep`** — multi-agent forensic audit: 7 scoped auditors,
+  adversarial verification of every high-severity finding, ideation lenses, and a
+  polished shareable HTML report with a token-waste ledger and phased cleanup plan.
+  Flags: `--thorough`, `--no-ideas`, `--yes`. New support files: `scripts/deep-recon.py`
+  (deterministic read-only ground truth), `scripts/deep-audit-workflow.js` (canonical
+  orchestration, degrades gracefully without Workflow/subagents), and
+  `skills/audit/{deep-audit.md,report-template.html}`.
+
+### Removed
+- Historical design spec from `docs/superpowers/specs/` (recoverable from git history).
+
 ## [0.5.0] - 2026-04-04
 
 ### Added

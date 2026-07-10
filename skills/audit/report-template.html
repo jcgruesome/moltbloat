@@ -1,0 +1,109 @@
+<!-- moltbloat deep-audit report template.
+     ASSEMBLY RULES (for the agent building the report):
+     - Replace every {{TOKEN}} and delete these comments. Never ship a literal {{TOKEN}}.
+     - Do NOT add <!doctype>/<html>/<head>/<body> wrappers if publishing via an
+       Artifact-style tool that wraps for you; otherwise wrap it yourself.
+     - Duplicate the sample blocks (finding card, ledger row, idea card, phase)
+       as many times as the data needs; delete unused sample blocks.
+     - Severity classes: crit | warn | low. Verification chips: use class "ok"
+       for CONFIRMED, "warn" for PARTIAL; omit REFUTED findings from the report
+       body and count them in the method footer instead.
+     - Keep the palette; it is theme-aware (light/dark) out of the box. -->
+<title>{{REPORT_TITLE}}</title>
+<style>:root{--bg:#FAFAF7;--bg-raise:#FFFFFF;--bg-inset:#F1F2ED;--ink:#1C2321;--ink-2:#4A5551;--ink-3:#7D8A85;--line:#DDE1D9;--accent:#0E7C6B;--accent-soft:#E3F0ED;--crit:#B3382C;--crit-soft:#F7E9E7;--warn:#9A6D0B;--warn-soft:#F5EEDC;--low:#5B6B75;--low-soft:#EAEEF0;--mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,monospace;--disp:"Avenir Next Condensed","Avenir Next","Helvetica Neue",-apple-system,sans-serif;--body:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}@media (prefers-color-scheme:dark){:root{--bg:#131715;--bg-raise:#1A201D;--bg-inset:#0E1210;--ink:#E6EBE7;--ink-2:#A9B5AF;--ink-3:#71807A;--line:#2A322E;--accent:#45C0A9;--accent-soft:#12312B;--crit:#E0685B;--crit-soft:#3A1D19;--warn:#D9A83C;--warn-soft:#33290F;--low:#8FA0AB;--low-soft:#1E262B}}:root[data-theme="dark"]{--bg:#131715;--bg-raise:#1A201D;--bg-inset:#0E1210;--ink:#E6EBE7;--ink-2:#A9B5AF;--ink-3:#71807A;--line:#2A322E;--accent:#45C0A9;--accent-soft:#12312B;--crit:#E0685B;--crit-soft:#3A1D19;--warn:#D9A83C;--warn-soft:#33290F;--low:#8FA0AB;--low-soft:#1E262B}:root[data-theme="light"]{--bg:#FAFAF7;--bg-raise:#FFFFFF;--bg-inset:#F1F2ED;--ink:#1C2321;--ink-2:#4A5551;--ink-3:#7D8A85;--line:#DDE1D9;--accent:#0E7C6B;--accent-soft:#E3F0ED;--crit:#B3382C;--crit-soft:#F7E9E7;--warn:#9A6D0B;--warn-soft:#F5EEDC;--low:#5B6B75;--low-soft:#EAEEF0}*{box-sizing:border-box}body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.55;margin:0}.wrap{max-width:880px;margin:0 auto;padding:0 28px 96px}a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}code{font-family:var(--mono);font-size:.86em;background:var(--bg-inset);border-radius:3px;padding:1px 5px;word-break:break-all}pre{font-family:var(--mono);font-size:12.5px;line-height:1.6;background:var(--bg-inset);border:1px solid var(--line);border-radius:6px;padding:14px 16px;overflow-x:auto}header{padding:56px 0 0}.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:14px}h1{font-family:var(--disp);font-weight:600;font-size:46px;line-height:1.04;margin:0 0 10px;letter-spacing:-.01em;text-wrap:balance}.sub{color:var(--ink-2);font-size:16px;max-width:62ch;margin:0 0 8px}.meta{font-family:var(--mono);font-size:11.5px;color:var(--ink-3)}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:8px;overflow:hidden;margin:34px 0 8px}.stat{background:var(--bg-raise);padding:16px 18px 14px}.stat b{display:block;font-family:var(--disp);font-weight:600;font-size:32px;line-height:1;font-variant-numeric:tabular-nums}.stat b.bad{color:var(--crit)}.stat b.good{color:var(--accent)}.stat span{font-size:12px;color:var(--ink-3);display:block;margin-top:5px;line-height:1.35}@media (max-width:640px){.stats{grid-template-columns:repeat(2,1fr)}}nav.toc{display:flex;flex-wrap:wrap;gap:8px 18px;margin:26px 0 0;padding:14px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);font-family:var(--mono);font-size:12px}nav.toc a{color:var(--ink-2)}nav.toc a::before{content:"§ ";color:var(--ink-3)}section{margin-top:64px}h2{font-family:var(--disp);font-weight:600;font-size:29px;margin:0 0 6px;text-wrap:balance}.kicker{font-family:var(--mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3);margin-bottom:6px}.lede{color:var(--ink-2);max-width:68ch;margin:0 0 22px}h3{font-size:17px;margin:34px 0 10px}p{max-width:70ch}.finding{background:var(--bg-raise);border:1px solid var(--line);border-left-width:4px;border-radius:6px;padding:14px 18px 13px;margin:12px 0}.finding.crit{border-left-color:var(--crit)}.finding.warn{border-left-color:var(--warn)}.finding.low{border-left-color:var(--low)}.fhead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}.chip{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:2px 7px;border-radius:3px;white-space:nowrap}.chip.crit{background:var(--crit-soft);color:var(--crit)}.chip.warn{background:var(--warn-soft);color:var(--warn)}.chip.low{background:var(--low-soft);color:var(--low)}.chip.ok{background:var(--accent-soft);color:var(--accent)}.finding p{margin:8px 0 0;font-size:14px;color:var(--ink-2);max-width:none}.finding .fix{margin-top:8px;font-size:14px}.finding .fix::before{content:"FIX";font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;color:var(--accent);background:var(--accent-soft);padding:2px 6px;border-radius:3px;margin-right:8px;vertical-align:1px}.tok{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);margin-top:8px}.ledger .row{display:grid;grid-template-columns:1fr auto;gap:16px;padding:7px 2px;border-bottom:1px dotted var(--line);font-size:13.5px;align-items:baseline}.ledger .row span:last-child{font-family:var(--mono);font-size:12.5px;font-variant-numeric:tabular-nums;color:var(--crit);white-space:nowrap}.ledger .row.total{border-top:2px solid var(--ink);border-bottom:none;font-weight:600}.cb{background:var(--bg-raise);border:1px solid var(--line);border-radius:6px;padding:14px 18px;margin:12px 0}.cb p{margin:7px 0 0;font-size:14px;color:var(--ink-2);max-width:none}.cb .apply::before{content:"APPLY";font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;color:var(--accent);background:var(--accent-soft);padding:2px 6px;border-radius:3px;margin-right:8px;vertical-align:1px}.phase{display:grid;grid-template-columns:44px 1fr;gap:0 18px;margin:22px 0;align-items:start}.phase .n{font-family:var(--disp);font-weight:600;font-size:30px;color:var(--accent);line-height:1.15}.phase h4{margin:2px 0 6px;font-size:16px}.phase p{margin:0 0 8px;font-size:14px;color:var(--ink-2)}.phase .why{font-size:12.5px;color:var(--ink-3)}.callout{background:var(--accent-soft);border-radius:6px;padding:14px 18px;margin:18px 0;font-size:14px}.callout.red{background:var(--crit-soft)}.callout b:first-child{display:block;margin-bottom:4px}footer{margin-top:72px;padding-top:18px;border-top:1px solid var(--line);font-family:var(--mono);font-size:11px;color:var(--ink-3);line-height:1.8}</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">Configuration audit · {{CONFIG_DIR}}</div>
+  <h1>{{HEADLINE — one vivid sentence naming the root cause, not a generic title}}</h1>
+  <p class="sub">{{SUBTITLE — one sentence: what ran, and that highs were adversarially verified}}</p>
+  <p class="meta">{{DATE}} · {{N_AUDITORS}} auditors + {{N_VERIFIERS}} verifiers{{IDEATION_NOTE}} · {{TOTAL_TOKENS}} tokens · {{N_FINDINGS}} findings, {{N_CONFIRMED}} highs CONFIRMED</p>
+
+  <div class="stats">
+    <div class="stat"><b class="bad">{{TOKENS_WASTED}}</b><span>tokens of waste injected into every session's context</span></div>
+    <div class="stat"><b class="bad">{{DISK_TOTAL}}</b><span>on disk; {{DISK_RECLAIMABLE}} safely reclaimable</span></div>
+    <div class="stat"><b class="bad">{{HEADLINE_COUNT}}</b><span>{{HEADLINE_COUNT_LABEL — e.g. "phantom agents referenced + orphaned dirs"}}</span></div>
+    <div class="stat"><b class="good">{{KEEP_COUNT}}</b><span>things genuinely earning their keep (see verdicts)</span></div>
+  </div>
+
+  <nav class="toc">
+    <a href="#tldr">TL;DR</a>
+    <a href="#ledger">Token ledger</a>
+    <a href="#findings">Findings by area</a>
+    <a href="#ideas">Outside the box</a>
+    <a href="#plan">The plan</a>
+  </nav>
+</header>
+
+<section id="tldr">
+  <div class="kicker">Executive summary</div>
+  <h2>{{TLDR_HEADING}}</h2>
+  <p class="lede">{{TLDR — 2-3 paragraphs: the root cause every auditor converged on, its second-order effects (contradiction tax, rule dilution, cache churn), and what is genuinely good}}</p>
+  <div class="callout">
+    <b>What's genuinely good and should be protected</b>
+    {{KEEP_LIST — the components with real usage/verified value}}
+  </div>
+</section>
+
+<section id="ledger">
+  <div class="kicker">Token economics</div>
+  <h2>The per-session waste ledger</h2>
+  <p class="lede">Overhead injected into every session's context, midpoint estimates from the auditors.</p>
+  <div class="ledger">
+    <!-- sample row — duplicate per ledger line -->
+    <div class="row"><span>{{LEDGER_ITEM_DESCRIPTION}}</span><span>−{{TOKENS}}</span></div>
+    <div class="row total"><span>Recoverable, per session, every session</span><span>≈ −{{TOTAL_TOKENS_WASTED}}</span></div>
+  </div>
+</section>
+
+<section id="findings">
+  <div class="kicker">Detail</div>
+  <h2>Findings by area</h2>
+  <p class="lede">{{N_CONFIRMED}} high-severity findings survived adversarial verification. Highs shown as cards; mediums and lows compressed into the paragraph after each area.</p>
+
+  <!-- per area: h3 + high-severity cards + one compressed paragraph of med/low -->
+  <h3>{{AREA_NAME}}</h3>
+  <!-- sample finding card — duplicate per verified high finding -->
+  <div class="finding crit">
+    <div class="fhead"><span class="chip crit">High</span><span class="chip ok">Confirmed</span><strong>{{FINDING_TITLE}}</strong></div>
+    <p>{{FINDING_DETAIL — with evidence quotes inline}}</p>
+    <p class="fix">{{RECOMMENDATION}}</p>
+    <div class="tok">{{TOKEN_IMPACT}}</div>
+  </div>
+  <p><span class="chip warn">Med</span> {{compressed medium finding}}. · <span class="chip low">Low</span> {{compressed low finding}}.</p>
+</section>
+
+<section id="ideas">
+  <div class="kicker">Way outside the box</div>
+  <h2>Ideas: thinking you haven't thought</h2>
+  <p class="lede">{{N_LENSES}} ideation lenses ran over the verified digest.</p>
+  <h3>Lens · {{LENS_NAME}}</h3>
+  <!-- sample idea card — duplicate per idea -->
+  <div class="cb">
+    <div class="fhead"><strong>{{IDEA_TITLE}}</strong></div>
+    <p>{{IDEA_DESCRIPTION}}</p>
+    <p class="apply">{{IMPLEMENTATION — with real commands}}</p>
+  </div>
+</section>
+
+<section id="plan">
+  <div class="kicker">Execution</div>
+  <h2>The plan: {{N_PHASES}} passes, biggest lever first</h2>
+  <p class="lede">Ordered so each pass is independently safe and independently valuable.</p>
+  <!-- sample phase — duplicate per pass -->
+  <div class="phase"><div class="n">1</div><div>
+    <h4>{{PASS_TITLE}} ({{EXPECTED_SAVINGS}})</h4>
+    <p>{{PASS_ACTIONS — concrete steps with paths}}</p>
+    <p class="why">Why: {{PASS_RATIONALE}}</p>
+  </div></div>
+  <div class="callout red">
+    <b>Before you start</b>
+    {{SAFETY_NOTES — git the config first, capture a ccusage cost baseline BEFORE purging transcripts, known re-injection traps}}
+  </div>
+</section>
+
+<footer>
+  Method: {{METHOD_NOTE — auditor scopes → adversarial verification (report refuted count) → ideation lenses; agent/token totals}}<br>
+  Generated by moltbloat /audit --deep · sources: {{CONFIG_DIR}} on disk · recon facts · usage history.
+</footer>
+</div>
