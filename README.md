@@ -85,6 +85,9 @@ Token-budget shows the actual dollar cost of your ecosystem overhead:
 ### Compatibility detection
 Finds plugin conflicts before they cause mysterious behavior: hook collisions, skill name shadowing, duplicate MCP tools. Smart duplicate detection identifies semantic overlaps (e.g., two Vercel deployment plugins) even with different names.
 
+### Claude.ai connector overlap
+Org-managed connectors from claude.ai (`mcp__claude_ai_<Service>__*`) are invisible to `settings.json` — injected per-session, not written to any local config. moltbloat mines session transcripts (like `/moltbloat:usage` does) to find which connectors are attached and flags local plugins/MCPs duplicating them, matched by shared tool names, not a hardcoded service list.
+
 ### Fully dynamic
 All checks are structural — no hardcoded plugin names or curated opinion lists. The audit detects redundancy by analyzing what's actually installed and where things overlap, not by maintaining a database of "X replaces Y." The ecosystem evolves fast; moltbloat keeps up automatically.
 
@@ -105,6 +108,7 @@ Customize thresholds, costs, and defaults in `~/.moltbloat/config.json`:
 
 - **Plugins**: disabled, zero-skill, stale cache versions
 - **MCP servers**: duplicates of native features or other plugins
+- **Claude.ai connectors**: org-managed connectors overlapping a local plugin/MCP
 - **Skills**: cross-plugin overlap and name collisions
 - **Agents**: local vs plugin-provided duplicates
 - **Rules**: language sets that don't match project languages

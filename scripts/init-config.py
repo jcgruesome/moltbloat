@@ -19,7 +19,9 @@ DEFAULT_CONFIG = {
         "snapshot_stale_days": 30,
         "baseline_max_age_days": 90,
         "usage_compact_lines": 5000,
-        "stale_days": 30
+        "stale_days": 30,
+        "connector_overlap_min_shared_tools": 2,
+        "connector_overlap_boilerplate_df": 3
     },
     "costs": {
         "opus_per_1m_tokens": 15.00,
