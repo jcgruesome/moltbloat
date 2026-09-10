@@ -222,6 +222,21 @@ def collect(config_dir, state_path):
 
     section("plugin_surface", plugin_surface)
 
+    def claude_ai_connectors():
+        # claude.ai connectors never touch local config; only transcripts see them.
+        # Reuse connector-overlap.py so the matching logic lives in one place.
+        script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "connector-overlap.py")
+        projects_dir = os.path.join(config_dir, "projects")
+        if not os.path.isdir(projects_dir) or not os.path.isfile(script):
+            return None
+        out = run([sys.executable, script, projects_dir, "--json"])
+        try:
+            return json.loads(out)
+        except (json.JSONDecodeError, ValueError):
+            return {"error": out[:500]}
+
+    section("claude_ai_connectors", claude_ai_connectors)
+
     def memory_systems():
         out = {}
         proj = os.path.join(config_dir, "projects")
@@ -249,7 +264,7 @@ def collect(config_dir, state_path):
 def to_markdown(facts):
     lines = ["# DEEP-RECON FACTS", f"Config dir: {facts['config_dir']}", ""]
     for key in ["disk", "injected_files", "settings", "local_inventory", "phantom_refs",
-                "state", "plugin_surface", "memory_systems"]:
+                "state", "plugin_surface", "claude_ai_connectors", "memory_systems"]:
         lines.append(f"## {key}")
         lines.append("```json")
         lines.append(json.dumps(facts.get(key), indent=1, default=str))

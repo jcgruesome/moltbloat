@@ -136,12 +136,27 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    find ~/.claude/rules -name "*.md" -type f 2>/dev/null
    ```
 
-   **2f. Projects**
+   **2f. Claude.ai connector overlap**
+
+   claude.ai org-managed connectors (`mcp__claude_ai_<Service>__*`) are granted
+   per-session from org settings and never appear in `settings.json`,
+   `.claude.json`, or any plugin manifest — the only trace they leave is session
+   transcripts. Scan those for overlap with local plugins/MCPs (structural
+   tool-name matching, no hardcoded service list):
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get thresholds.connector_overlap_min_shared_tools
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get thresholds.connector_overlap_boilerplate_df
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/connector-overlap.py" ~/.claude/projects --json \
+     --min-shared <value above> --boilerplate-df <value above>
+   ```
+   If `~/.claude/projects` has no transcripts yet, note that and move on.
+
+   **2g. Projects**
    ```bash
    du -sh ~/.claude/projects/*/ 2>/dev/null | sort -rh
    ```
 
-   **2g. Stale data**
+   **2h. Stale data**
    ```bash
    du -sh ~/.claude/plugins/cache/*/*/*/ 2>/dev/null | sort -rh | head -20
    ```
@@ -341,6 +356,24 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    - Two plugins share some keywords but have different primary purposes
    - Example: "typescript-lsp" and "pyright-lsp" (different languages, same pattern)
 
+   ### Check 13: Claude.ai Org Connector Overlap
+   For each entry in `connector-overlap.py`'s `overlaps` (step 2f), let ratio =
+   shared_tool_count / min(connector_tool_count, local_tool_count):
+   - `match_basis` both/tools, ratio ≥ 0.9 → CRITICAL (functionally identical)
+   - `match_basis` both/tools, ratio ≥ 0.5 → HIGH
+   - `match_basis` tools, ratio < 0.5 → MEDIUM (partial overlap)
+   - `match_basis` name only (no shared tools) → LOW; call it an unverified lead,
+     not a confirmed duplicate
+
+   Name both sides plainly ("org connector `claude_ai_Slack` overlaps the local
+   `slack` plugin — 27/28 shared tools"). Recommend dropping the local plugin
+   unless it's customized (auth, defaults, extra tools) — the connector is
+   centrally managed by the org, so it's usually the side to keep.
+
+   **Caveat**: this only sees connectors that have appeared in a transcript. One
+   attached today with zero sessions since won't show up — a detection gap, not
+   evidence it doesn't exist.
+
 4. **Classify findings**
 
    Assign severity to each finding:
@@ -462,6 +495,8 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
        "total_plugins": 21,
        "total_skills": 275,
        "total_mcp_servers": 16,
+       "total_claude_ai_connectors": 5,
+       "connector_overlaps": 2,
        "health_score": 45
      },
      "plugins": [

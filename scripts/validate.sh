@@ -140,6 +140,14 @@ else
   ((ERRORS++))
 fi
 
+# connector-overlap detector — deterministic fixture-based test
+if python3 "$PLUGIN_ROOT/scripts/test-connector-overlap.py" >/dev/null 2>&1; then
+  echo "  ✓ test-connector-overlap.py: all assertions pass"
+else
+  echo "  ✗ test-connector-overlap.py: FAILED"
+  ((ERRORS++))
+fi
+
 echo ""
 echo "Checking for duplicates..."
 

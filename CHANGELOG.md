@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-09-10
+
+### Added
+- **Claude.ai connector overlap detection** — new audit Check 13 (standard and
+  `--deep`) finds overlap between org-managed claude.ai connectors
+  (`mcp__claude_ai_<Service>__*`, invisible to `settings.json`/`.claude.json`) and
+  locally-installed plugins/MCPs, by mining the same session-transcript source
+  `/moltbloat:usage` reads and matching tool-name suffixes structurally. New
+  `scripts/connector-overlap.py` (with tests), a `claude_ai_connectors` recon fact
+  in `deep-recon.py`, and two new config thresholds.
+
+### Changed
+- CI's total-size gate raised from 200KB/150KB (hard/soft) to 230KB/180KB — the
+  repo was already at 196KB before this feature, leaving no headroom for it.
+
 ## [0.8.2] - 2026-07-10
 
 ### Fixed
