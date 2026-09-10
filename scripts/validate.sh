@@ -129,6 +129,13 @@ else
   ((ERRORS++))
 fi
 
+if python3 -m py_compile "$PLUGIN_ROOT/scripts/claude-md-staleness.py" 2>/dev/null; then
+  echo "  ✓ claude-md-staleness.py: syntax valid"
+else
+  echo "  ✗ claude-md-staleness.py: syntax errors"
+  ((ERRORS++))
+fi
+
 echo ""
 echo "Running unit tests..."
 
@@ -145,6 +152,14 @@ if python3 "$PLUGIN_ROOT/scripts/test-connector-overlap.py" >/dev/null 2>&1; the
   echo "  ✓ test-connector-overlap.py: all assertions pass"
 else
   echo "  ✗ test-connector-overlap.py: FAILED"
+  ((ERRORS++))
+fi
+
+# claude-md-staleness checker — deterministic fixture-based test
+if python3 "$PLUGIN_ROOT/scripts/test-claude-md-staleness.py" >/dev/null 2>&1; then
+  echo "  ✓ test-claude-md-staleness.py: all assertions pass"
+else
+  echo "  ✗ test-claude-md-staleness.py: FAILED"
   ((ERRORS++))
 fi
 

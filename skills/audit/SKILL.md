@@ -374,6 +374,39 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    attached today with zero sessions since won't show up — a detection gap, not
    evidence it doesn't exist.
 
+   ### Check 14: CLAUDE.md / SKILL.md Staleness and Bloat
+
+   Anthropic recommends periodically rewriting CLAUDE.md as Claude Code's own
+   capabilities move on. This cross-references file content against a dated
+   snapshot of Claude Code's changelog/docs, unlike Check 1/`phantom_refs`
+   (internal dead references/collisions only — no duplication here).
+
+   **Collect files**: `~/.claude/CLAUDE.md`, the nearest project `CLAUDE.md`
+   (`git rev-parse --show-toplevel`), and every `SKILL.md` under active
+   plugin install paths (reuse Check 1's inventory).
+
+   **Build known-skill-refs** (no hardcoded names): the same skill inventory
+   from step 2c/Check 1, as `plugin:skill` and bare `skill` strings.
+
+   **Run**:
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/claude-md-staleness.py" \
+     ~/.claude/CLAUDE.md <project CLAUDE.md if found> <collected SKILL.md paths> \
+     --known-skill-refs "$(echo "$known_skills" | paste -sd, -)" \
+     --verbose-threshold "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get thresholds.claude_md_verbose_lines)"
+   ```
+
+   Checks: **known deprecations** (`KNOWN_DEPRECATIONS` table, dated snapshot,
+   needs periodic manual refresh — an empty result isn't proof nothing's
+   stale); **verbosity** (over the configured line ceiling, default 200);
+   **structure** (long file, too few headers); **unknown skill references**
+   (a `/plugin:skill` mention matching nothing in known-skill-refs — likely
+   renamed or removed).
+
+   Map severities directly (`deprecated_reference`/`unknown_skill_reference`
+   → MEDIUM/HIGH; `verbose`/`unstructured` → LOW). Include the script's table
+   in the report; report-only, never rewrites the user's files.
+
 4. **Classify findings**
 
    Assign severity to each finding:

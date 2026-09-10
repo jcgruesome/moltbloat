@@ -6,7 +6,7 @@ import sys
 from datetime import datetime, timezone
 
 CONFIG_PATH = os.path.expanduser("~/.moltbloat/config.json")
-CONFIG_VERSION = "1.2"
+CONFIG_VERSION = "1.3"
 
 DEFAULT_CONFIG = {
     "version": CONFIG_VERSION,
@@ -21,7 +21,8 @@ DEFAULT_CONFIG = {
         "usage_compact_lines": 5000,
         "stale_days": 30,
         "connector_overlap_min_shared_tools": 2,
-        "connector_overlap_boilerplate_df": 3
+        "connector_overlap_boilerplate_df": 3,
+        "claude_md_verbose_lines": 200
     },
     "costs": {
         "opus_per_1m_tokens": 15.00,
