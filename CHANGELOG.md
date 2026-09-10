@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-09-10
+
+### Added
+- **`scripts/local-skills-scan.py`** — Claude Code now auto-loads skills from
+  `.claude/skills/` directly (user-level `~/.claude/skills/` and nested
+  per-project dirs), no marketplace or plugin install required. The audit's
+  Check 1 (skill name collisions) previously only inventoried plugin skills
+  and `~/.claude/commands/`, so a local `.claude/skills/` entry shadowing a
+  plugin skill, or two local skill dirs sharing a name, went undetected.
+  `/moltbloat:audit` now feeds this source into Check 1. Includes
+  `scripts/test-local-skills-scan.py`, wired into `scripts/validate.sh`.
+
 ## [0.10.0] - 2026-09-10
 
 ### Added
