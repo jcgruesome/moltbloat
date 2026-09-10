@@ -163,6 +163,14 @@ else
   ((ERRORS++))
 fi
 
+# local-skills-scan: deterministic fixture-based test
+if python3 "$PLUGIN_ROOT/scripts/test-local-skills-scan.py" >/dev/null 2>&1; then
+  echo "  ✓ test-local-skills-scan.py: all assertions pass"
+else
+  echo "  ✗ test-local-skills-scan.py: FAILED"
+  ((ERRORS++))
+fi
+
 echo ""
 echo "Checking for duplicates..."
 

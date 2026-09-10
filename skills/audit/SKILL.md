@@ -121,6 +121,12 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    ```bash
    ls ~/.claude/commands/ 2>/dev/null
    ```
+   Claude Code also auto-loads skills from `~/.claude/skills/` and nested
+   project-level `.claude/skills/` directly, no marketplace needed. Scan:
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/local-skills-scan.py"
+   ```
+   Feed the result into Check 1 below as an additional skill source.
 
    **2d. Agents**
    ```bash
@@ -179,12 +185,17 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
 
    Find duplicates: `cut -d'|' -f1 | sort | uniq -d`
 
+   Pass this map as JSON (`{"<skill>": "<plugin>"}`) to
+   `local-skills-scan.py --plugin-skills-file` (step 2c): a `.claude/skills/`
+   entry shadowing a plugin skill is invisible to the scan above otherwise.
+
    For each collision, include in findings:
    ```
    | Skill Name | Plugin A | Plugin B | Risk |
    ```
 
-   **Impact**: When invoking `/<skill>`, ambiguous which version runs (last loaded wins).
+   **Impact**: When invoking `/<skill>`, ambiguous which version runs (last loaded wins,
+   though Claude Code disambiguates same-named nested `.claude/skills/` entries as `<dir>:<name>`).
    **Fix**: Disable one plugin or use fully-qualified names: `/plugin-a:skill` vs `/plugin-b:skill`
 
    Severity:
