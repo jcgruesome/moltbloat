@@ -13,7 +13,7 @@
 
 [![CI](https://github.com/jcgruesome/moltbloat/actions/workflows/ci.yml/badge.svg)](https://github.com/jcgruesome/moltbloat/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-0.8.1-blue.svg)](https://github.com/jcgruesome/moltbloat/releases)
+[![Version](https://img.shields.io/badge/version-0.10.0-blue.svg)](https://github.com/jcgruesome/moltbloat/releases)
 
 </div>
 
@@ -90,6 +90,9 @@ Org-managed connectors from claude.ai (`mcp__claude_ai_<Service>__*`) are invisi
 
 ### Fully dynamic
 All checks are structural — no hardcoded plugin names or curated opinion lists. The audit detects redundancy by analyzing what's actually installed and where things overlap, not by maintaining a database of "X replaces Y." The ecosystem evolves fast; moltbloat keeps up automatically.
+
+### CLAUDE.md / SKILL.md staleness
+Anthropic recommends periodically rewriting CLAUDE.md because Claude Code itself changes fast enough to make old instructions stale. `/moltbloat:audit` cross-references your CLAUDE.md and SKILL.md files against a dated snapshot of Claude Code's own changelog (renamed/removed commands, removed config keys, capability changes) alongside verbosity and structure heuristics and slash-command references that no longer resolve. The deprecation table is a documented snapshot, not a live feed, and this check never rewrites your files, only reports.
 
 ### Usage-aware recommendations
 Cross-references audit findings with actual usage data. A plugin with zero usage that duplicates another plugin's functionality gets flagged as high priority for removal. Usage tracking is silent and automatic.

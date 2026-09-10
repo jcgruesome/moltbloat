@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-09-10
+
+### Added
+- **CLAUDE.md / SKILL.md staleness and bloat check** — new Check 14 in
+  `/moltbloat:audit` (`scripts/claude-md-staleness.py`). Flags references to
+  Claude Code capabilities since renamed/removed/superseded (e.g.
+  `/reload-plugins`, `keybindingFlavor`, `defaultMode: "bypassPermissions"`)
+  via a small, dated snapshot table (`KNOWN_DEPRECATIONS`, 2026-09-10) built
+  from docs.claude.com/code.claude.com research — documented as a snapshot
+  needing periodic manual refresh, not a live feed. Also flags verbosity vs.
+  Anthropic's ~200-line CLAUDE.md guidance, low header density, and
+  `/plugin:skill` references matching no installed skill. Read-only, no
+  duplication of the existing `phantom_refs`/skill-collision checks. New
+  tests: `scripts/test-claude-md-staleness.py`.
+
+### Changed
+- CI's total-size gate raised again, 230KB/180KB (hard/soft) to 260KB/210KB —
+  two feature PRs landed the same day and the prior bump had no headroom left
+  for the second one after trimming both new files as far as reasonable.
+
 ## [0.9.0] - 2026-09-10
 
 ### Added
