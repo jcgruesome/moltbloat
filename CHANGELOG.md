@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.3] - 2026-09-10
+
+### Added
+- **Org-managed MCP server detection** — Claude Code lets an organization
+  admin centrally push MCP servers to every user via `managedMcpServers` in a
+  system `managed-settings.json` (macOS:
+  `/Library/Application Support/ClaudeCode/managed-settings.json`; Linux/WSL:
+  `/etc/claude-code/managed-settings.json`), similar in spirit to how
+  claude.ai connectors get centrally attached (moltbloat's existing Check 13).
+  This file lives outside `~/.claude/` and never touches `settings.json`,
+  `.claude.json`, or any plugin `.mcp.json`, so a managed server colliding
+  with a global, per-project, or plugin-provided MCP went completely
+  undetected by Check 2 (Duplicate MCP Servers) and Check 11 (MCP Tool
+  Collisions). New `scripts/managed-mcp-check.py` reads `managedMcpServers`
+  (absent file is the common case, handled without error) and cross-
+  references it against the other scopes; `scripts/deep-recon.py` now folds
+  it into `state()`'s duplicate-server-names detection and exposes it as a
+  new `managed_mcp` section. `skills/audit/SKILL.md` Check 2, Check 11, and
+  step 2b updated accordingly. New tests: `scripts/test-managed-mcp-check.py`,
+  wired into `scripts/validate.sh`.
+
 ## [0.11.2] - 2026-09-10
 
 ### Fixed
