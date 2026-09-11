@@ -26,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   step 2b updated accordingly. New tests: `scripts/test-managed-mcp-check.py`,
   wired into `scripts/validate.sh`.
 
+### Changed
+- CI's total-size gate raised again, 260KB/210KB (hard/soft) to 320KB/260KB —
+  four feature PRs landed in one day and the incremental bumps each merge
+  kept hitting the same wall within a few KB. Sized generously this time for
+  near-term headroom rather than repeating a same-day chain of small bumps.
+
 ## [0.11.2] - 2026-09-10
 
 ### Fixed

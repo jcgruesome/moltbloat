@@ -13,7 +13,7 @@
 
 [![CI](https://github.com/jcgruesome/moltbloat/actions/workflows/ci.yml/badge.svg)](https://github.com/jcgruesome/moltbloat/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-0.11.2-blue.svg)](https://github.com/jcgruesome/moltbloat/releases)
+[![Version](https://img.shields.io/badge/version-0.11.3-blue.svg)](https://github.com/jcgruesome/moltbloat/releases)
 
 </div>
 
@@ -110,7 +110,7 @@ Customize thresholds, costs, and defaults in `~/.moltbloat/config.json`:
 ## What it checks
 
 - **Plugins**: disabled, zero-skill, stale cache versions
-- **MCP servers**: duplicates of native features or other plugins
+- **MCP servers**: duplicates of native features or other plugins, including org-managed `managedMcpServers`
 - **Claude.ai connectors**: org-managed connectors overlapping a local plugin/MCP
 - **Skills**: cross-plugin overlap and name collisions, including local `.claude/skills/` shadowing a plugin skill
 - **CLAUDE.md / SKILL.md**: staleness against Claude Code's own changelog, verbosity, and bloat
