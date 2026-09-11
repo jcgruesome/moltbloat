@@ -143,8 +143,23 @@ else
   ((ERRORS++))
 fi
 
+if python3 -m py_compile "$PLUGIN_ROOT/scripts/count-installed-plugins.py" 2>/dev/null; then
+  echo "  ✓ count-installed-plugins.py: syntax valid"
+else
+  echo "  ✗ count-installed-plugins.py: syntax errors"
+  ((ERRORS++))
+fi
+
 echo ""
 echo "Running unit tests..."
+
+# count-installed-plugins — deterministic fixture-based test
+if python3 "$PLUGIN_ROOT/scripts/test-count-installed-plugins.py" >/dev/null 2>&1; then
+  echo "  ✓ test-count-installed-plugins.py: all assertions pass"
+else
+  echo "  ✗ test-count-installed-plugins.py: FAILED"
+  ((ERRORS++))
+fi
 
 # init-config — deterministic fixture-based test
 if python3 "$PLUGIN_ROOT/scripts/test-init-config.py" >/dev/null 2>&1; then
