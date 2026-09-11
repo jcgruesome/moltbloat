@@ -1,24 +1,13 @@
 #!/usr/bin/env python3
-"""Detect org-managed MCP servers (`managedMcpServers`) and cross-reference them
-against locally configured MCP servers for name collisions.
-
-`managedMcpServers` is how a Claude Code organization admin centrally pushes MCP
-servers to every user, in addition to whatever servers a user configures
-themselves (docs: https://code.claude.com/docs/en/managed-mcp). It lives in
-`managed-settings.json`, a system file outside `~/.claude/` entirely, and never
-touches `.claude.json`, `settings.json`, or any plugin `.mcp.json` -- so
-moltbloat's Check 2 (Duplicate MCP Servers) and Check 11 (MCP Tool Collisions)
-never see it. Most users have no org-managed settings at all: an absent or
-unreadable file is the common case, not an error.
-
-Managed settings file locations (per Claude Code docs, "Deploy managed
-settings"): macOS `/Library/Application Support/ClaudeCode/managed-settings.json`,
-Linux/WSL `/etc/claude-code/managed-settings.json`. (Windows uses
-`C:\\Program Files\\ClaudeCode\\managed-settings.json`; not resolved by default
-here since moltbloat targets macOS/Linux.)
+"""Detect org-managed MCP servers (`managedMcpServers`) and cross-reference
+against local MCP servers (global, per-project, plugin `.mcp.json`) for name
+collisions. `managedMcpServers` centrally pushes servers to every user via a
+system `managed-settings.json` outside `~/.claude/`
+(docs: https://code.claude.com/docs/en/managed-mcp) -- moltbloat's Check 2 and
+Check 11 never see it otherwise. Absent/unreadable file -> common case, not
+an error.
 
 Usage: python3 managed-mcp-check.py [CONFIG_DIR] [--managed-settings PATH] [--json]
-Output: markdown, or one JSON object with --json. Read-only; never writes.
 """
 import glob
 import json
