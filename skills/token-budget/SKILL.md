@@ -38,9 +38,11 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
 
    Use these values for calculations:
    - Cost rates: fable_per_1m_tokens, opus_per_1m_tokens, sonnet_per_1m_tokens, haiku_per_1m_tokens
-   - Context window: context_window_tokens (default: 1000000)
+   - Context window: `costs.context_windows` is a per-model map (fable_5_1, opus_5, sonnet_5: 1,000,000; haiku_4_5: 200,000). `costs.context_window_tokens` (default: 1,000,000) is the flat fallback shared by Opus 5, Sonnet 5, and Fable 5.1.
    - Token estimates: tokens_per_byte (default: 0.25), tokens_per_skill, tokens_per_mcp_tool, tokens_per_agent
    - Daily messages: messages_per_day (default: 200)
+
+   **Which model's window to use**: if the user has stated which model they're on this session, use that model's entry from `context_windows`. Otherwise ask, or default to the shared 1,000,000-token window (Opus 5 / Sonnet 5 / Fable 5.1) unless the user has named Haiku, since Haiku 4.5 is the one model with a materially different (200,000-token) window. Never divide by 1,000,000 for a Haiku 4.5 user: it silently understates their real percentage by 5x.
 
 3. **Measure each context source**
 
@@ -134,14 +136,15 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
 
 4. **Build the budget table**
 
-   Calculate totals and percentages. Use 1,000,000 tokens as the context window size (Opus 5, Sonnet 5, and Fable 5.1 are all 1M; Haiku 4.5 is 200K — note this if the user is on Haiku).
+   Calculate totals and percentages against the active model's actual context window from `costs.context_windows` (Opus 5, Sonnet 5, and Fable 5.1 are all 1,000,000 tokens; Haiku 4.5 is 200,000 — a fixed byte total is 5x more of Haiku's window than of the others', so getting this denominator right matters). Every "% of window" figure below must use this same window size, not a hardcoded 1M.
 
    Output in this format:
 
    ```
    # Moltbloat Token Budget
 
-   **Context window**: 1,000,000 tokens
+   **Model**: <model in use, or "Opus 5 / Sonnet 5 / Fable 5.1 (assumed)" if unstated>
+   **Context window**: <window for that model, e.g. 1,000,000 tokens, or 200,000 tokens for Haiku 4.5>
    **Total ecosystem cost**: ~X tokens (Y% of window)
 
    ## Breakdown by Source
@@ -194,19 +197,21 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
 
    ## Context Pressure
 
-   Calculate what percentage of the context window is consumed by ecosystem overhead alone (before any user messages, tool results, or conversation history):
+   Calculate what percentage of the context window is consumed by ecosystem overhead alone (before any user messages, tool results, or conversation history). Divide by the active model's actual window from `costs.context_windows`, not a flat 1M — for a Haiku 4.5 user this denominator is 200,000, so the same overhead reads as a 5x larger percentage than it would for Opus 5/Sonnet 5/Fable 5.1:
 
    ```
-   Ecosystem overhead: ~<X> tokens (<Y>% of 1M context window)
+   Ecosystem overhead: ~<X> tokens (<Y>% of <window size> context window)
    Remaining for work: ~<Z> tokens
    ```
 
-   If overhead exceeds 3% (~30K tokens):
+   The 3%/5% thresholds below are percentages of the *correct* per-model window, so they already scale correctly for Haiku 4.5 once the denominator is right (e.g. ~6K tokens is 3% of Haiku's 200K window, versus ~30K tokens being 3% of the shared 1M window).
+
+   If overhead exceeds 3% of the active window:
    > **Context pressure: ELEVATED** — Your ecosystem consumes <Y>% of the context
    > window before you start working. For long sessions, you'll need to `/compact`
    > sooner. Consider `/moltbloat:profile lean` for extended work sessions.
 
-   If overhead exceeds 5% (~50K tokens):
+   If overhead exceeds 5% of the active window:
    > **Context pressure: HIGH** — At <Y>% ecosystem overhead, you're losing
    > significant working context. This means more frequent `/compact` cycles and
    > degraded performance in the last 20% of your context window. Strongly

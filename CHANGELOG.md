@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.11.2] - 2026-09-10
 
 ### Fixed
+- **`/moltbloat:token-budget` "% of context window" divided by a flat 1,000,000
+  regardless of which model the user is on** — Haiku 4.5's real context window
+  is 200,000 tokens, so a Haiku user's reported percentage was silently wrong
+  by 5x (e.g. "3% of window" when the true figure against Haiku's actual
+  window is "15%"). `scripts/init-config.py`'s `costs` section now stores a
+  per-model `context_windows` map (`fable_5_1`, `opus_5`, `sonnet_5`: 1,000,000;
+  `haiku_4_5`: 200,000) alongside the existing flat `context_window_tokens`
+  (kept as the shared 1M fallback for Opus 5/Sonnet 5/Fable 5.1; no other
+  script or skill reads the flat value, so nothing else was broken by adding
+  the per-model map). `skills/token-budget/SKILL.md`'s context-window and
+  Context Pressure calculations now divide by the active model's window
+  instead of a hardcoded 1M. New assertions in `scripts/test-init-config.py`.
 - **Check 4 (Zero-Skill Plugins) false-flagged output-style-only plugins** —
   Claude Code plugins can ship output styles as a first-class, auto-discovered
   component (`output-styles/` at the plugin root, per
