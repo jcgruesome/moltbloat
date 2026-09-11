@@ -30,6 +30,19 @@ def run():
     _assert(ic.DEFAULT_CONFIG["costs"]["haiku_per_1m_tokens"] == 1.00, "haiku 4.5 rate")
     _assert(ic.DEFAULT_CONFIG["costs"]["fable_per_1m_tokens"] == 10.00, "fable 5.1 rate present")
 
+    print("Test: per-model context windows are stored alongside the flat default")
+    windows = ic.DEFAULT_CONFIG["costs"]["context_windows"]
+    _assert(ic.DEFAULT_CONFIG["costs"]["context_window_tokens"] == 1000000, "flat context_window_tokens default unchanged (1M)")
+    _assert(windows["fable_5_1"] == 1000000, "fable 5.1 context window is 1M")
+    _assert(windows["opus_5"] == 1000000, "opus 5 context window is 1M")
+    _assert(windows["sonnet_5"] == 1000000, "sonnet 5 context window is 1M")
+    _assert(windows["haiku_4_5"] == 200000, "haiku 4.5 context window is 200K, not the shared 1M")
+
+    print("Test: migrating an old config without context_windows picks up the new default")
+    old_no_windows = {"version": "1.3", "costs": {"opus_per_1m_tokens": 5.00}}
+    migrated_windows = ic.migrate_config(old_no_windows)
+    _assert(migrated_windows["costs"]["context_windows"]["haiku_4_5"] == 200000, "migrated config gains context_windows dict")
+
     print("Test: migrating an old config refreshes untouched stale defaults")
     old = {
         "version": "1.3",

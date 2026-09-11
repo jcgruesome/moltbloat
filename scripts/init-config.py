@@ -29,7 +29,13 @@ DEFAULT_CONFIG = {
         "opus_per_1m_tokens": 5.00,
         "sonnet_per_1m_tokens": 2.00,
         "haiku_per_1m_tokens": 1.00,
-        "context_window_tokens": 1000000
+        "context_window_tokens": 1000000,
+        "context_windows": {
+            "fable_5_1": 1000000,
+            "opus_5": 1000000,
+            "sonnet_5": 1000000,
+            "haiku_4_5": 200000
+        }
     },
     "estimates": {
         "tokens_per_byte": 0.25,
