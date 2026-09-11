@@ -31,6 +31,37 @@ def load_json(path):
         return json.load(f)
 
 
+# Plugin component directories, per the Claude Code plugin directory convention
+# (code.claude.com/docs/en/plugins-reference: "File locations reference" /
+# "Standard plugin layout"). output-styles/ is a first-class, auto-discovered
+# component directory alongside skills/, commands/, agents/ — a plugin shipping
+# only an output style is not "doing nothing".
+COMPONENT_DIRS = {
+    "skills": "skills",
+    "commands": "commands",
+    "agents": "agents",
+    "output_styles": "output-styles",
+}
+
+
+def plugin_component_counts(version_dirs):
+    """Count each component type across a plugin's cached version directories.
+
+    version_dirs: absolute paths to cached version directories (e.g.
+    cache/<market>/<plugin>/<version>). For each component, takes the max
+    count seen across versions (mirrors plugin_surface's "max across cached
+    versions" semantics, since only the active version matters but any cached
+    version might be it). Returns a dict keyed by COMPONENT_DIRS' keys.
+    """
+    counts = {name: 0 for name in COMPONENT_DIRS}
+    for vd in version_dirs:
+        for key, dirname in COMPONENT_DIRS.items():
+            d = os.path.join(vd, dirname)
+            if os.path.isdir(d):
+                counts[key] = max(counts[key], len(os.listdir(d)))
+    return counts
+
+
 def collect(config_dir, state_path):
     facts = {"config_dir": config_dir, "state_file": state_path, "errors": []}
 
@@ -207,17 +238,10 @@ def collect(config_dir, state_path):
                 if not os.path.isdir(pdir):
                     continue
                 versions = [v for v in os.listdir(pdir) if os.path.isdir(os.path.join(pdir, v))]
-                skills = commands = agents = 0
-                for v in versions:
-                    vd = os.path.join(pdir, v)
-                    sd = os.path.join(vd, "skills")
-                    cd = os.path.join(vd, "commands")
-                    ad = os.path.join(vd, "agents")
-                    skills = max(skills, len(os.listdir(sd))) if os.path.isdir(sd) else skills
-                    commands = max(commands, len(os.listdir(cd))) if os.path.isdir(cd) else commands
-                    agents = max(agents, len(os.listdir(ad))) if os.path.isdir(ad) else agents
+                counts = plugin_component_counts([os.path.join(pdir, v) for v in versions])
                 out.append({"plugin": f"{plugin}@{market}", "versions_cached": len(versions),
-                            "skills": skills, "commands": commands, "agents": agents})
+                            "skills": counts["skills"], "commands": counts["commands"],
+                            "agents": counts["agents"], "output_styles": counts["output_styles"]})
         return sorted(out, key=lambda x: -(x["skills"] + x["commands"]))[:40]
 
     section("plugin_surface", plugin_surface)

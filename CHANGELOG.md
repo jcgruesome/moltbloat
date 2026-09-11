@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.2] - 2026-09-10
+
+### Fixed
+- **Check 4 (Zero-Skill Plugins) false-flagged output-style-only plugins** —
+  Claude Code plugins can ship output styles as a first-class, auto-discovered
+  component (`output-styles/` at the plugin root, per
+  code.claude.com/docs/en/plugins-reference), distinct from skills, agents,
+  MCP servers, hooks, and rules. Check 4 never counted these, so a plugin
+  providing only an output style was flagged MEDIUM as "doing nothing" when it
+  was actually providing real functionality. `scripts/deep-recon.py`'s
+  `plugin_surface()` now also counts output styles per plugin (new
+  `plugin_component_counts()` helper, extracted for unit testing), and
+  `skills/audit/SKILL.md` Check 4 now treats 1+ output styles as evidence a
+  plugin isn't zero-value. New tests: `scripts/test-deep-recon.py`.
+
 ## [0.11.1] - 2026-09-10
 
 ### Fixed
