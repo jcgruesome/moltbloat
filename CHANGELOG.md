@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.1] - 2026-09-11
+
+### Fixed
+- **`/moltbloat:diagnose` always reported "Installed plugins: 0"** — its
+  Claude Code environment check counted with `grep -c '"name"'` against
+  `installed_plugins.json`, but that file keys plugins as
+  `"<plugin>@<marketplace>"` entries under a top-level `plugins` object; there
+  is no `"name"` field to match. Verified against a real installation with 28
+  plugins: the old check reported 0 every time. New
+  `scripts/count-installed-plugins.py` reads the actual JSON structure
+  (missing/malformed file degrades to 0 rather than raising, since this feeds
+  a diagnostic report). New tests: `scripts/test-count-installed-plugins.py`.
+
 ## [0.12.0] - 2026-09-10
 
 ### Added

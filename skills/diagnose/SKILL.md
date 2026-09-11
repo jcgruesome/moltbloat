@@ -118,7 +118,7 @@ Run a comprehensive self-diagnostic on the moltbloat installation and its enviro
    # Check if we can read the plugin registry
    if [ -f "$HOME/.claude/plugins/installed_plugins.json" ]; then
      echo "Plugin registry: readable"
-     plugin_count=$(grep -c '"name"' "$HOME/.claude/plugins/installed_plugins.json" 2>/dev/null || echo 0)
+     plugin_count=$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/count-installed-plugins.py" 2>/dev/null || echo 0)
      echo "Installed plugins: $plugin_count"
    else
      echo "Plugin registry: NOT FOUND — Claude Code may not be initialized"
