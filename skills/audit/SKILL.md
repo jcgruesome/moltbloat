@@ -231,7 +231,12 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    **Fix**: Remove local copy if identical to plugin version.
 
    ### Check 4: Zero-Skill Plugins
-   For each enabled plugin, count its skills, MCP servers, agents, hooks, and rules. Flag any enabled plugin providing none of these — it's doing nothing.
+   For each enabled plugin, count its skills, MCP servers, agents, hooks, rules,
+   and output styles (an `output-styles/` directory at the plugin root — a
+   first-class, auto-discovered plugin component distinct from skills/agents,
+   per Claude Code's plugin directory convention). Flag any enabled plugin
+   providing none of these — it's doing nothing. A plugin that ships only an
+   output style still provides real functionality and must NOT be flagged.
    - MEDIUM severity
 
    ### Check 5: Disabled Plugins Still Installed

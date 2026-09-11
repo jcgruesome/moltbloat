@@ -179,6 +179,14 @@ else
   ((ERRORS++))
 fi
 
+# deep-recon plugin_component_counts (output-style counting): deterministic fixture-based test
+if python3 "$PLUGIN_ROOT/scripts/test-deep-recon.py" >/dev/null 2>&1; then
+  echo "  ✓ test-deep-recon.py: all assertions pass"
+else
+  echo "  ✗ test-deep-recon.py: FAILED"
+  ((ERRORS++))
+fi
+
 echo ""
 echo "Checking for duplicates..."
 
