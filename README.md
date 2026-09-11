@@ -81,12 +81,17 @@ Token-budget shows the actual dollar cost of your ecosystem overhead:
 - Per message at Fable/Opus/Sonnet/Haiku rates
 - Per day (assuming 200 messages)
 - Per month
+- Caching-aware: shows both the turn-1 uncached ceiling and the realistic turn-2+ steady-state price once static ecosystem content (CLAUDE.md, rules, skill listings, MCP tool defs) is prompt-cached — pricing every message at full rate overstates real cost 5-10x past one turn
+- Context-window percentage is computed against the model's actual window (Haiku 4.5's 200K vs. 1M for Opus 5/Sonnet 5/Fable 5.1), not a flat 1M
 
 ### Compatibility detection
 Finds plugin conflicts before they cause mysterious behavior: hook collisions, skill name shadowing, duplicate MCP tools. Smart duplicate detection identifies semantic overlaps (e.g., two Vercel deployment plugins) even with different names. Skill collision detection covers `.claude/skills/` too — Claude Code auto-loads skills from there directly, no plugin install required, so a local skill silently shadowing a plugin's skill of the same name is caught, not just plugin-vs-plugin collisions.
 
 ### Claude.ai connector overlap
 Org-managed connectors from claude.ai (`mcp__claude_ai_<Service>__*`) are invisible to `settings.json` — injected per-session, not written to any local config. moltbloat mines session transcripts (like `/moltbloat:usage` does) to find which connectors are attached and flags local plugins/MCPs duplicating them, matched by shared tool names, not a hardcoded service list.
+
+### Org-managed MCP servers
+Same blind spot, different source: `managedMcpServers` in a system `managed-settings.json` lets an org admin centrally push MCP servers to every user, outside `.claude.json`/`settings.json`/plugin `.mcp.json` entirely. moltbloat reads it and flags a managed server colliding with a global, per-project, or plugin-provided MCP.
 
 ### Fully dynamic
 All checks are structural — no hardcoded plugin names or curated opinion lists. The audit detects redundancy by analyzing what's actually installed and where things overlap, not by maintaining a database of "X replaces Y." The ecosystem evolves fast; moltbloat keeps up automatically.
