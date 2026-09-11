@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-09-10
+
+### Added
+- **Caching-aware `/moltbloat:token-budget` dollar cost.** "Cost in
+  Dollars" priced every message at full uncached input rate, overstating
+  steady-state cost roughly 5-10x for any session past one turn, since
+  ecosystem overhead (CLAUDE.md, rules, skill listings, MCP tool defs) is
+  static and gets cached after turn 1. Added `costs.cache_write_multiplier`
+  (~1.25x base) and `costs.cache_read_multiplier` (~0.1x base) to
+  `scripts/init-config.py`. New `scripts/cache-cost.py` computes the
+  uncached ceiling, turn-1 write cost, turn-2+ read cost, a session-blended
+  average, and daily/monthly cost deterministically; SKILL.md now shows
+  turn-1 worst case and turn-2+ steady state side by side. New tests:
+  `scripts/test-cache-cost.py`. Base per-1M rates unchanged. Unrelated to
+  Claude Code's context-window auto-compaction.
+
 ## [0.11.3] - 2026-09-10
 
 ### Added

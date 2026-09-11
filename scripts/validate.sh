@@ -136,6 +136,13 @@ else
   ((ERRORS++))
 fi
 
+if python3 -m py_compile "$PLUGIN_ROOT/scripts/cache-cost.py" 2>/dev/null; then
+  echo "  ✓ cache-cost.py: syntax valid"
+else
+  echo "  ✗ cache-cost.py: syntax errors"
+  ((ERRORS++))
+fi
+
 echo ""
 echo "Running unit tests..."
 
@@ -192,6 +199,14 @@ if python3 "$PLUGIN_ROOT/scripts/test-managed-mcp-check.py" >/dev/null 2>&1; the
   echo "  ✓ test-managed-mcp-check.py: all assertions pass"
 else
   echo "  ✗ test-managed-mcp-check.py: FAILED"
+  ((ERRORS++))
+fi
+
+# cache-cost calculator: deterministic fixture-based test
+if python3 "$PLUGIN_ROOT/scripts/test-cache-cost.py" >/dev/null 2>&1; then
+  echo "  ✓ test-cache-cost.py: all assertions pass"
+else
+  echo "  ✗ test-cache-cost.py: FAILED"
   ((ERRORS++))
 fi
 

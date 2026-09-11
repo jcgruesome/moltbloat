@@ -35,7 +35,11 @@ DEFAULT_CONFIG = {
             "opus_5": 1000000,
             "sonnet_5": 1000000,
             "haiku_4_5": 200000
-        }
+        },
+        # Prompt-cache multipliers on the base rate above: write (~once per
+        # 5-min window) vs. read (every later turn reusing the cache).
+        "cache_write_multiplier": 1.25,
+        "cache_read_multiplier": 0.1
     },
     "estimates": {
         "tokens_per_byte": 0.25,

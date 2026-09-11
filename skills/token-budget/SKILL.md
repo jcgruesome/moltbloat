@@ -172,28 +172,43 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
 
    ## Cost in Dollars
 
-   Estimate real dollar cost of ecosystem overhead per message and per day.
+   Show both the uncached ceiling and the realistic steady-state price once
+   Anthropic's prompt cache is warm. Ecosystem content (CLAUDE.md, rules,
+   skill listings, MCP tool defs) is static within a session, exactly what
+   prompt caching targets: turn 1 pays the cache-write rate (~1.25x base,
+   writing the content to cache), every later turn in that session reads the
+   cache instead at ~0.1x base (~90% cheaper). Pricing every message at full
+   rate, as this skill used to, overstates steady-state cost 5-10x for any
+   session past one turn. Pure API-level prompt-caching economics on input
+   tokens, unrelated to Claude Code's own context-window auto-compaction.
 
-   Use these rates (input tokens — ecosystem content is always input; pull the
-   live values from `costs` in step 2, these are current as of the Claude 5
-   family/Fable 5.1 pricing):
-   - **Fable 5.1**: $10.00 / 1M input tokens
-   - **Opus 5**: $5.00 / 1M input tokens
-   - **Sonnet 5**: $2.00 / 1M input tokens
-   - **Haiku 4.5**: $1.00 / 1M input tokens
+   Rates (from `costs` in step 2): Fable 5.1 $10.00, Opus 5 $5.00, Sonnet 5
+   $2.00, Haiku 4.5 $1.00 (per 1M input tokens). Also from `costs`:
+   `cache_write_multiplier` (default 1.25), `cache_read_multiplier`
+   (default 0.1).
 
-   Calculate: `(total_tokens / 1,000,000) * rate`
+   Run once per model with `scripts/cache-cost.py` (computes the uncached
+   ceiling, turn-1 write cost, turn-2+ read cost, a session-blended average,
+   and daily/monthly cost) rather than doing the arithmetic in prose:
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/cache-cost.py" \
+     --tokens <total_tokens> --rate <model_rate_per_1m> \
+     --write-mult <cache_write_multiplier> --read-mult <cache_read_multiplier> \
+     --messages-per-day 200 --json
+   ```
 
-   Assume 200 messages/day for daily cost.
+   | Model | Turn 1 (uncached ceiling) | Turn 2+ (cache read, steady state) | Per Day (200 msgs) | Per Month |
+   |-------|---------------------------|-------------------------------------|---------------------|-----------|
+   | Fable 5.1 | $<uncached_cost> | $<cached_turn_cost> | $<daily_cost> | $<monthly_cost> |
+   | Opus 5 | $<uncached_cost> | $<cached_turn_cost> | $<daily_cost> | $<monthly_cost> |
+   | Sonnet 5 | $<uncached_cost> | $<cached_turn_cost> | $<daily_cost> | $<monthly_cost> |
+   | Haiku 4.5 | $<uncached_cost> | $<cached_turn_cost> | $<daily_cost> | $<monthly_cost> |
 
-   | Model | Per Message | Per Day (200 msgs) | Per Month |
-   |-------|------------|-------------------|-----------|
-   | Fable 5.1 | $<per-message> | $<per-day> | $<per-month> |
-   | Opus 5 | $<per-message> | $<per-day> | $<per-month> |
-   | Sonnet 5 | $<per-message> | $<per-day> | $<per-month> |
-   | Haiku 4.5 | $<per-message> | $<per-day> | $<per-month> |
-
-   **Note**: This is the FIXED overhead cost — the ecosystem tax you pay on every message regardless of what you're doing. Your actual message content and tool results are on top of this.
+   **Note**: "Turn 1" is the honest worst case (caching off, or a fresh
+   session). "Turn 2+" is the realistic steady state once ecosystem content
+   is cached. Both are FIXED overhead, the ecosystem tax on every message
+   regardless of what you're doing; actual message content and tool results
+   are on top of this.
 
    ## Context Pressure
 
