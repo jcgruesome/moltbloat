@@ -13,7 +13,7 @@
 
 [![CI](https://github.com/jcgruesome/moltbloat/actions/workflows/ci.yml/badge.svg)](https://github.com/jcgruesome/moltbloat/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-0.11.0-blue.svg)](https://github.com/jcgruesome/moltbloat/releases)
+[![Version](https://img.shields.io/badge/version-0.11.1-blue.svg)](https://github.com/jcgruesome/moltbloat/releases)
 
 </div>
 
@@ -78,7 +78,7 @@ Switch between `lean` (2-3 plugins, ~5K tokens) and `full` (everything, ~40K+ to
 
 ### Real dollar costs
 Token-budget shows the actual dollar cost of your ecosystem overhead:
-- Per message at Opus/Sonnet/Haiku rates
+- Per message at Fable/Opus/Sonnet/Haiku rates
 - Per day (assuming 200 messages)
 - Per month
 

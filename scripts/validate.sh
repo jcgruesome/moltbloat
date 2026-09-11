@@ -139,6 +139,14 @@ fi
 echo ""
 echo "Running unit tests..."
 
+# init-config — deterministic fixture-based test
+if python3 "$PLUGIN_ROOT/scripts/test-init-config.py" >/dev/null 2>&1; then
+  echo "  ✓ test-init-config.py: all assertions pass"
+else
+  echo "  ✗ test-init-config.py: FAILED"
+  ((ERRORS++))
+fi
+
 # parse-history miner — deterministic fixture-based test
 if python3 "$PLUGIN_ROOT/scripts/test-parse-history.py" >/dev/null 2>&1; then
   echo "  ✓ test-parse-history.py: all assertions pass"

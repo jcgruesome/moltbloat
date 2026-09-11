@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.1] - 2026-09-10
+
+### Fixed
+- **`/moltbloat:token-budget` cost rates were stale (Opus 4.6/Sonnet 4.6/Haiku 4.5
+  era pricing)** — updated to current Claude 5 family rates: Opus 5 $5.00/1M
+  input (was $15.00), Sonnet 5 $2.00/1M (was $3.00), Haiku 4.5 $1.00/1M (was
+  $0.80), plus a new `fable_per_1m_tokens` rate ($10.00/1M) for Fable 5.1.
+  `scripts/init-config.py`'s migration previously deep-merged a user's existing
+  `~/.moltbloat/config.json` verbatim, so this fix would never have reached
+  anyone who already had a config file on disk — added `SUPERSEDED_DEFAULTS`
+  to `migrate_config()` so a rate still sitting at its old default gets
+  refreshed on upgrade, while a genuinely customized rate is left alone. Also
+  fixed a latent bug in the same function: its shallow `DEFAULT_CONFIG.copy()`
+  aliased nested dicts (`costs`, `thresholds`, ...) to the module-level
+  default, so migrating a config mutated `DEFAULT_CONFIG` itself for the rest
+  of the process. New tests: `scripts/test-init-config.py`.
+
 ## [0.11.0] - 2026-09-10
 
 ### Added

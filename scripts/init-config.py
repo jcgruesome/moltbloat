@@ -6,7 +6,7 @@ import sys
 from datetime import datetime, timezone
 
 CONFIG_PATH = os.path.expanduser("~/.moltbloat/config.json")
-CONFIG_VERSION = "1.3"
+CONFIG_VERSION = "1.4"
 
 DEFAULT_CONFIG = {
     "version": CONFIG_VERSION,
@@ -25,9 +25,10 @@ DEFAULT_CONFIG = {
         "claude_md_verbose_lines": 200
     },
     "costs": {
-        "opus_per_1m_tokens": 15.00,
-        "sonnet_per_1m_tokens": 3.00,
-        "haiku_per_1m_tokens": 0.80,
+        "fable_per_1m_tokens": 10.00,
+        "opus_per_1m_tokens": 5.00,
+        "sonnet_per_1m_tokens": 2.00,
+        "haiku_per_1m_tokens": 1.00,
         "context_window_tokens": 1000000
     },
     "estimates": {
@@ -63,10 +64,35 @@ DEFAULT_CONFIG = {
 }
 
 
+# Built-in default values that were later corrected (e.g. stale model pricing).
+# A deep-merge migration alone can't tell "user customized this" from "user
+# never touched this, it's still the old default" — so refresh a value only
+# when it still equals the OLD default below; a genuinely customized value is
+# left alone. Each entry: dotted path -> value it used to default to.
+SUPERSEDED_DEFAULTS = {
+    "costs.opus_per_1m_tokens": 15.00,
+    "costs.sonnet_per_1m_tokens": 3.00,
+    "costs.haiku_per_1m_tokens": 0.80,
+}
+
+
+def _refresh_superseded_defaults(config):
+    """Overwrite values still sitting at an old default with the new one."""
+    for dotted, old_default in SUPERSEDED_DEFAULTS.items():
+        section, key = dotted.split(".", 1)
+        if section not in config or key not in config[section]:
+            continue
+        if config[section][key] == old_default:
+            config[section][key] = DEFAULT_CONFIG[section][key]
+
+
 def migrate_config(old_config):
     """Migrate old config to current schema."""
-    config = DEFAULT_CONFIG.copy()
-    
+    # A shallow .copy() would leave nested dicts (costs, thresholds, ...)
+    # aliased to DEFAULT_CONFIG's own, so mutating config[key] below would
+    # corrupt the module-level default for the rest of the process.
+    config = {k: (v.copy() if isinstance(v, dict) else v) for k, v in DEFAULT_CONFIG.items()}
+
     # Deep merge existing values
     for key, value in old_config.items():
         if key == "version":
@@ -75,11 +101,13 @@ def migrate_config(old_config):
             config[key].update(value)
         else:
             config[key] = value
-    
+
+    _refresh_superseded_defaults(config)
+
     # Update version and migration timestamp
     config["version"] = CONFIG_VERSION
     config["migrated"] = datetime.now(timezone.utc).isoformat()
-    
+
     return config
 
 

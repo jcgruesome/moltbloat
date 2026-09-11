@@ -37,7 +37,7 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
    ```
 
    Use these values for calculations:
-   - Cost rates: opus_per_1m_tokens, sonnet_per_1m_tokens, haiku_per_1m_tokens
+   - Cost rates: fable_per_1m_tokens, opus_per_1m_tokens, sonnet_per_1m_tokens, haiku_per_1m_tokens
    - Context window: context_window_tokens (default: 1000000)
    - Token estimates: tokens_per_byte (default: 0.25), tokens_per_skill, tokens_per_mcp_tool, tokens_per_agent
    - Daily messages: messages_per_day (default: 200)
@@ -134,7 +134,7 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
 
 4. **Build the budget table**
 
-   Calculate totals and percentages. Use 1,000,000 tokens as the context window size (1M for opus).
+   Calculate totals and percentages. Use 1,000,000 tokens as the context window size (Opus 5, Sonnet 5, and Fable 5.1 are all 1M; Haiku 4.5 is 200K — note this if the user is on Haiku).
 
    Output in this format:
 
@@ -171,10 +171,13 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
 
    Estimate real dollar cost of ecosystem overhead per message and per day.
 
-   Use these rates (input tokens — ecosystem content is always input):
-   - **Opus 4.6**: $15.00 / 1M input tokens
-   - **Sonnet 4.6**: $3.00 / 1M input tokens
-   - **Haiku 4.5**: $0.80 / 1M input tokens
+   Use these rates (input tokens — ecosystem content is always input; pull the
+   live values from `costs` in step 2, these are current as of the Claude 5
+   family/Fable 5.1 pricing):
+   - **Fable 5.1**: $10.00 / 1M input tokens
+   - **Opus 5**: $5.00 / 1M input tokens
+   - **Sonnet 5**: $2.00 / 1M input tokens
+   - **Haiku 4.5**: $1.00 / 1M input tokens
 
    Calculate: `(total_tokens / 1,000,000) * rate`
 
@@ -182,8 +185,9 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
 
    | Model | Per Message | Per Day (200 msgs) | Per Month |
    |-------|------------|-------------------|-----------|
-   | Opus 4.6 | $<per-message> | $<per-day> | $<per-month> |
-   | Sonnet 4.6 | $<per-message> | $<per-day> | $<per-month> |
+   | Fable 5.1 | $<per-message> | $<per-day> | $<per-month> |
+   | Opus 5 | $<per-message> | $<per-day> | $<per-month> |
+   | Sonnet 5 | $<per-message> | $<per-day> | $<per-month> |
    | Haiku 4.5 | $<per-message> | $<per-day> | $<per-month> |
 
    **Note**: This is the FIXED overhead cost — the ecosystem tax you pay on every message regardless of what you're doing. Your actual message content and tool results are on top of this.
