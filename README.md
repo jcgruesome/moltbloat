@@ -83,7 +83,7 @@ Token-budget shows the actual dollar cost of your ecosystem overhead:
 - Per month
 
 ### Compatibility detection
-Finds plugin conflicts before they cause mysterious behavior: hook collisions, skill name shadowing, duplicate MCP tools. Smart duplicate detection identifies semantic overlaps (e.g., two Vercel deployment plugins) even with different names.
+Finds plugin conflicts before they cause mysterious behavior: hook collisions, skill name shadowing, duplicate MCP tools. Smart duplicate detection identifies semantic overlaps (e.g., two Vercel deployment plugins) even with different names. Skill collision detection covers `.claude/skills/` too — Claude Code auto-loads skills from there directly, no plugin install required, so a local skill silently shadowing a plugin's skill of the same name is caught, not just plugin-vs-plugin collisions.
 
 ### Claude.ai connector overlap
 Org-managed connectors from claude.ai (`mcp__claude_ai_<Service>__*`) are invisible to `settings.json` — injected per-session, not written to any local config. moltbloat mines session transcripts (like `/moltbloat:usage` does) to find which connectors are attached and flags local plugins/MCPs duplicating them, matched by shared tool names, not a hardcoded service list.
@@ -112,7 +112,8 @@ Customize thresholds, costs, and defaults in `~/.moltbloat/config.json`:
 - **Plugins**: disabled, zero-skill, stale cache versions
 - **MCP servers**: duplicates of native features or other plugins
 - **Claude.ai connectors**: org-managed connectors overlapping a local plugin/MCP
-- **Skills**: cross-plugin overlap and name collisions
+- **Skills**: cross-plugin overlap and name collisions, including local `.claude/skills/` shadowing a plugin skill
+- **CLAUDE.md / SKILL.md**: staleness against Claude Code's own changelog, verbosity, and bloat
 - **Agents**: local vs plugin-provided duplicates
 - **Rules**: language sets that don't match project languages
 - **Hooks**: conflicts, injection load, context bloat
