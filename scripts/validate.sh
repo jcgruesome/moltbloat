@@ -187,6 +187,14 @@ else
   ((ERRORS++))
 fi
 
+# managed-mcp-check: deterministic fixture-based test
+if python3 "$PLUGIN_ROOT/scripts/test-managed-mcp-check.py" >/dev/null 2>&1; then
+  echo "  ✓ test-managed-mcp-check.py: all assertions pass"
+else
+  echo "  ✗ test-managed-mcp-check.py: FAILED"
+  ((ERRORS++))
+fi
+
 echo ""
 echo "Checking for duplicates..."
 

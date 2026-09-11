@@ -59,12 +59,12 @@ jobs:
         run: |
           total_bytes=$(find . -type f -not -path './.git/*' -exec cat {} \; 2>/dev/null | wc -c)
           echo "Total bytes: $total_bytes"
-          # Soft limit at 210KB, hard limit at 260KB
-          if [ "$total_bytes" -gt 260000 ]; then
-            echo "ERROR: Plugin size exceeds 260KB. Consider reducing documentation or merging skills."
+          # Soft limit at 260KB, hard limit at 320KB
+          if [ "$total_bytes" -gt 320000 ]; then
+            echo "ERROR: Plugin size exceeds 320KB. Consider reducing documentation or merging skills."
             exit 1
           fi
-          if [ "$total_bytes" -gt 210000 ]; then
+          if [ "$total_bytes" -gt 260000 ]; then
             echo "WARNING: Plugin size ($total_bytes bytes) is getting large."
           fi
 

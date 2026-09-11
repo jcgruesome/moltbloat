@@ -62,8 +62,25 @@ def plugin_component_counts(version_dirs):
     return counts
 
 
+def managed_mcp_facts(config_dir):
+    """Org-managed MCP servers (`managedMcpServers`), via managed-mcp-check.py.
+
+    Computed once and shared by the `state` duplicate-detection dict and the
+    dedicated `managed_mcp` section, so the subprocess only runs once per audit.
+    """
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "managed-mcp-check.py")
+    if not os.path.isfile(script):
+        return None
+    out = run([sys.executable, script, config_dir, "--json"])
+    try:
+        return json.loads(out)
+    except (json.JSONDecodeError, ValueError):
+        return {"error": out[:500]}
+
+
 def collect(config_dir, state_path):
     facts = {"config_dir": config_dir, "state_file": state_path, "errors": []}
+    managed_mcp_cache = managed_mcp_facts(config_dir)
 
     def section(name, fn):
         try:
@@ -199,11 +216,17 @@ def collect(config_dir, state_path):
                 proj_servers[path] = sorted(ms.keys())
             if not os.path.isdir(path):
                 dead_projects.append(path)
-        # duplicate server names across scopes
+        # duplicate server names across scopes, including org-managed servers
+        # (`managedMcpServers`, from managed-settings.json — see managed_mcp_facts)
         seen = {name: ["(global)"] for name in gm}
         for path, names in proj_servers.items():
             for n in names:
                 seen.setdefault(n, []).append(path)
+        managed_names = []
+        if isinstance(managed_mcp_cache, dict):
+            managed_names = managed_mcp_cache.get("managed_servers") or []
+        for n in managed_names:
+            seen.setdefault(n, []).append("(managed)")
         dupes = {n: scopes for n, scopes in seen.items() if len(scopes) > 1}
         usage = d.get("skillUsage") or {}
 
@@ -214,6 +237,7 @@ def collect(config_dir, state_path):
         return {
             "global_mcp_servers": sorted(gm.keys()),
             "project_mcp_servers": proj_servers,
+            "managed_mcp_servers": sorted(managed_names),
             "duplicate_server_names": dupes,
             "project_count": len(projects),
             "dead_project_paths": dead_projects[:20],
@@ -261,6 +285,13 @@ def collect(config_dir, state_path):
 
     section("claude_ai_connectors", claude_ai_connectors)
 
+    # Org-managed MCP servers (`managedMcpServers`) live in a system
+    # managed-settings.json outside config_dir and never touch settings.json
+    # or .claude.json. Already computed once (managed_mcp_cache, above) so the
+    # `state` duplicate-detection dict and this section share one subprocess run;
+    # absence of the file is the common case, handled by managed-mcp-check.py.
+    section("managed_mcp", lambda: managed_mcp_cache)
+
     def memory_systems():
         out = {}
         proj = os.path.join(config_dir, "projects")
@@ -288,7 +319,7 @@ def collect(config_dir, state_path):
 def to_markdown(facts):
     lines = ["# DEEP-RECON FACTS", f"Config dir: {facts['config_dir']}", ""]
     for key in ["disk", "injected_files", "settings", "local_inventory", "phantom_refs",
-                "state", "plugin_surface", "claude_ai_connectors", "memory_systems"]:
+                "state", "plugin_surface", "claude_ai_connectors", "managed_mcp", "memory_systems"]:
         lines.append(f"## {key}")
         lines.append("```json")
         lines.append(json.dumps(facts.get(key), indent=1, default=str))
