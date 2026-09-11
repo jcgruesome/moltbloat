@@ -112,6 +112,22 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    ```
    Build a combined list of all MCP servers with their source (global config vs plugin).
 
+   **2b (cont). Managed MCP servers**
+
+   An org admin can centrally push MCP servers to every user via `managedMcpServers`
+   in a system `managed-settings.json` (macOS:
+   `/Library/Application Support/ClaudeCode/managed-settings.json`; Linux/WSL:
+   `/etc/claude-code/managed-settings.json`) — this file lives outside
+   `~/.claude/` entirely and never touches `settings.json`, `.claude.json`, or
+   any plugin `.mcp.json`. Most machines have no org-managed settings at all;
+   an absent file is the common case, not a finding. Scan it and cross-reference
+   against the servers gathered above:
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/managed-mcp-check.py" ~/.claude --json
+   ```
+   Add any name collision it reports into the combined MCP server list from
+   step 2b as a `(managed)` source, so Check 2 and Check 11 below see it.
+
    **2c. Skills**
    Count skills per plugin:
    ```bash
@@ -203,10 +219,10 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    - HIGH if individual collisions between different plugins
 
    ### Check 2: Duplicate MCP Servers
-   Check if the same underlying MCP server is loaded from both global config AND a plugin, or from multiple plugins.
+   Check if the same underlying MCP server is loaded from both global config AND a plugin, or from multiple plugins, or from an org-managed source (`managedMcpServers`, step 2b).
 
-   Compare MCP server names and npm package names across all sources. Flag duplicates.
-   - CRITICAL if same MCP is loaded from 2+ sources (causes tool name conflicts)
+   Compare MCP server names and npm package names across all sources, including managed servers. Flag duplicates.
+   - CRITICAL if same MCP is loaded from 2+ sources (causes tool name conflicts) — this includes a managed server colliding with a global, per-project, or plugin-provided one
 
    ### Check 3: Agent Name Collisions (Detailed)
    Compare agents across sources:
@@ -329,9 +345,12 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    
    # From global config
    cat ~/.claude/settings.json 2>/dev/null | grep -A100 '"mcpServers"'
+
+   # From org-managed settings (step 2b) — absent on most machines
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/managed-mcp-check.py" ~/.claude --json
    ```
 
-   Flag if same MCP server name appears from multiple sources (e.g., playwright from both global config AND plugin).
+   Flag if same MCP server name appears from multiple sources (e.g., playwright from both global config AND plugin, or a `managedMcpServers` entry colliding with either).
    - CRITICAL: Same MCP loaded from 2+ sources (tool name conflicts)
 
 ### Check 12: Semantic Duplicates (Smart Detection)
