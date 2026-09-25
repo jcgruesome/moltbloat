@@ -55,22 +55,34 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
    **2.0 Measured context ledger (run first)**
 
    Claude Code records what it injected at session start in the transcripts.
-   Measure that directly:
+   Measure that directly, scoping the instruction-file rows to this project
+   so a CLAUDE.md or rules file from a different project on the machine
+   never gets added into this one's total:
    ```bash
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/context-ledger.py" --json \
      --samples <context_ledger_samples> --max-sessions <context_ledger_max_sessions> \
-     --tokens-per-byte <tokens_per_byte>
+     --tokens-per-byte <tokens_per_byte> \
+     --project "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
    ```
 
    - Exit 0: use `sources.*.median_tokens` for every source it reports
      (skill listing, deferred tool names, MCP server instructions, agent
      listing, SessionStart hook context, and each instruction file). These
      replace the estimates in 2a, 2d, 2e, 2f, and 2g for those sources.
+     Any instruction file under a `rules/` directory that the ledger
+     reports replaces the corresponding est. Rules row from 2b entirely;
+     it is not added on top of the estimate.
+   - If `format_errors` is non-empty: tell the user which records could not
+     be parsed (quote each entry) and mark the affected rows "partial" in
+     the budget table, since the ledger's numbers for those sources may
+     undercount.
    - Sources in `missing`: fall back to the estimate for that source only,
-     and mark its row "est.".
-   - Exit 1 (no transcripts) or 2 (format not recognized): tell the user
-     the ledger is unavailable and why (quote stderr), then use estimates
-     for every row, all marked "est.". Do not hide this.
+     and mark its row "est.", except `hook_context` and `mcp_instructions`,
+     which have no estimator in 2a-2g. For those two, when they're in
+     `missing`, show "not present in transcripts" and exclude them from
+     TOTAL entirely. Never show 0 or an invented number for them.
+   - Any non-zero exit: tell the user the ledger is unavailable and quote
+     stderr verbatim, then use estimates for every row marked est.
 
    The 2a to 2g measurements below still run: they supply rows the ledger
    does not cover (per-plugin breakdown, rules not seen loaded) and the
@@ -188,7 +200,7 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
    <one row per other file in `sources.instructions.files` not already
    covered above, e.g. an AutoMem `MEMORY.md` or an ancestor-directory
    `CLAUDE.md`>
-   | Skill listing (N skills) | - | X | X% | measured (N) / est. | Listed every turn |
+   | Skill listing (N skills, newest session) | - | X | X% | measured (N) / est. | In context every turn |
    | Deferred tool names (N names) | - | X | X% | measured (N) / est. | Names only; schemas load on use |
    | MCP server instructions | - | X | X% | measured (N) / est. | Per-server instruction blocks |
    | Agent listing | - | X | X% | measured (N) / est. | Agent types and descriptions |
@@ -216,12 +228,18 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
 
    - Top 5 servers by deferred-name chars and by MCP instruction chars
      (from `by_server`), top 5 plugins by skill listing chars
-     (`skill_listing.by_owner`), and hook context by owner
+     (`skill_listing.by_owner`, newest session), and hook context by owner
      (`hook_context.by_owner`), each named so the user can disable it.
-   - If `sources.skill_listing.dropped` is non-empty: "Your skill listing
-     hit its size budget. N skills appear by name only, so Claude cannot
-     match them to a request:" then the names. Suggest disabling unused
-     skill-heavy plugins (see `/moltbloat:usage`).
+   - If `sources.skill_listing.dropped` is non-empty (newest session):
+     split it by `reason` rather than reporting every entry the same way.
+     For entries with `reason == "has_description"`: "N skills are listed
+     by name only; the description exists on disk but Claude never sees
+     it:" then the names. Suggest disabling unused skill-heavy plugins
+     (see `/moltbloat:usage`). For entries with `reason ==
+     "source_not_found"`, list them separately: "N skills are listed by
+     name only; their description could not be verified locally:" then the
+     names. Do not call this second group dropped, since there is no local
+     source confirming they ever had one.
    - If `hook_context.unparsed_outputs` > 0: note that some SessionStart
      hooks print non-JSON output, which is not counted as context.
 
@@ -309,7 +327,12 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
    ## Recommendations
    - Items consuming >5% of context with low/no usage should be reviewed
    - Consider disabling language rules you don't actively use
-   - MCP tools are the hidden cost — each registered tool consumes ~350 tokens
+   - MCP tools are a hidden cost. If `deferred_tools` was measured, cite the
+     measured figures: `deferred_tools.median_tokens` tokens across
+     `deferred_tools.median_names` tool names, currently names-only in
+     context until a tool is loaded, then its full schema counts too. Only
+     when `deferred_tools` is in `missing` (est. path), fall back to the
+     estimate: each registered tool consumes roughly 350 tokens.
    - Use `/moltbloat:profile lean` to cut costs for simple tasks
    - For long sessions, `/compact` at ~60% context to maintain quality
    - Run `/moltbloat:usage` to see which costly components you actually use
