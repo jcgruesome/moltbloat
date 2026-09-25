@@ -228,3 +228,39 @@ def dropped_skills(content, skill_descs):
         elif skill_descs[name]:
             out.append({"name": name, "reason": "has_description"})
     return out
+
+
+def _hook_commands(hooks_obj):
+    for groups in (hooks_obj or {}).values():
+        for group in groups or []:
+            for h in (group or {}).get("hooks") or []:
+                cmd = (h or {}).get("command")
+                if cmd:
+                    yield cmd
+
+
+def load_hook_owners(config_dir):
+    """Literal hook command string -> owner label.
+
+    Transcripts record commands unexpanded, so matching is verbatim.
+    """
+    owners = {}
+    manifest = os.path.join(config_dir, "plugins", "installed_plugins.json")
+    if os.path.isfile(manifest):
+        with open(manifest, encoding="utf-8") as f:
+            plugins = (json.load(f).get("plugins") or {})
+        for key, entries in plugins.items():
+            plugin = key.split("@", 1)[0]
+            for entry in entries or []:
+                hooks_path = os.path.join((entry or {}).get("installPath") or "", "hooks", "hooks.json")
+                if not os.path.isfile(hooks_path):
+                    continue
+                with open(hooks_path, encoding="utf-8") as f:
+                    for cmd in _hook_commands(json.load(f).get("hooks")):
+                        owners.setdefault(cmd, set()).add(plugin)
+    settings = os.path.join(config_dir, "settings.json")
+    if os.path.isfile(settings):
+        with open(settings, encoding="utf-8") as f:
+            for cmd in _hook_commands(json.load(f).get("hooks")):
+                owners.setdefault(cmd, set()).add("settings.json")
+    return {cmd: ", ".join(sorted(names)) for cmd, names in owners.items()}

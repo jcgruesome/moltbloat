@@ -163,10 +163,34 @@ def test_skill_overflow(d):
             "chars grouped by plugin prefix, continuation lines follow their entry")
 
 
+def test_hook_owners(d):
+    print("Test: load_hook_owners matches literal commands to plugins and settings.json")
+    config_dir = os.path.join(d, "cfg-hooks")
+    p1 = os.path.join(d, "cache-h", "alpha", "1.0.0")
+    p2 = os.path.join(d, "cache-h", "beta", "2.0.0")
+    shared = '"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh" start'
+    for root, cmds in ((p1, [shared, "${CLAUDE_PLUGIN_ROOT}/a.sh"]), (p2, [shared])):
+        os.makedirs(os.path.join(root, "hooks"), exist_ok=True)
+        with open(os.path.join(root, "hooks", "hooks.json"), "w") as f:
+            json.dump({"hooks": {"SessionStart": [{"matcher": "startup",
+                       "hooks": [{"type": "command", "command": c} for c in cmds]}]}}, f)
+    os.makedirs(os.path.join(config_dir, "plugins"), exist_ok=True)
+    with open(os.path.join(config_dir, "plugins", "installed_plugins.json"), "w") as f:
+        json.dump({"plugins": {"alpha@m": [{"installPath": p1}], "beta@m": [{"installPath": p2}]}}, f)
+    with open(os.path.join(config_dir, "settings.json"), "w") as f:
+        json.dump({"hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": "~/my-hook.sh"}]}]}}, f)
+
+    owners = cl.load_hook_owners(config_dir)
+    _assert(owners["${CLAUDE_PLUGIN_ROOT}/a.sh"] == "alpha", "unique plugin command attributed")
+    _assert(owners[shared] == "alpha, beta", "shared command lists both owners")
+    _assert(owners["~/my-hook.sh"] == "settings.json", "settings.json hook attributed")
+
+
 def run():
     with tempfile.TemporaryDirectory() as d:
         test_extract_session(d)
         test_skill_overflow(d)
+        test_hook_owners(d)
     print("All context-ledger tests passed.")
 
 
