@@ -186,11 +186,104 @@ def test_hook_owners(d):
     _assert(owners["~/my-hook.sh"] == "settings.json", "settings.json hook attributed")
 
 
+def listing_session(path, listing_chars, mtime, with_instructions=False, hooks_merged=None, hook_stdouts=()):
+    recs = [att({"type": "skill_listing", "content": "- s: " + "d" * (listing_chars - 5), "skillCount": 1})]
+    if with_instructions:
+        recs.append(att({"type": "instructions", "files": [{"path": "/g/CLAUDE.md", "type": "User", "content": "c" * 80}]}))
+    if hooks_merged is not None:
+        recs.append(att({"type": "hook_additional_context", "content": "h" * hooks_merged}))
+    for cmd, out in hook_stdouts:
+        recs.append(hook(out, command=cmd))
+    write_session(path, recs, mtime=mtime)
+
+
+def test_build_ledger(d):
+    print("Test: build_ledger samples per type, medians exclude absent sessions")
+    root = os.path.join(d, "projects")
+    ctx = lambda n: json.dumps({"hookSpecificOutput": {"additionalContext": "x" * n}})
+    listing_session(os.path.join(root, "p", "a.jsonl"), 100, 1000, with_instructions=True,
+                    hooks_merged=70, hook_stdouts=[("cmd-a", ctx(50)), ("cmd-z", ctx(20))])
+    listing_session(os.path.join(root, "p", "b.jsonl"), 200, 2000,
+                    hook_stdouts=[("cmd-a", ctx(30)), ("cmd-q", "{}")])
+    listing_session(os.path.join(root, "p", "c.jsonl"), 300, 3000, with_instructions=True)
+    write_session(os.path.join(root, "p", "c", "subagents", "agent-x.jsonl"),
+                  [att({"type": "skill_listing", "content": "- zzz", "skillCount": 1})], mtime=9000)
+
+    files = cl.find_sessions(root)
+    _assert([os.path.basename(f) for f in files] == ["c.jsonl", "b.jsonl", "a.jsonl"], "main sessions newest first, subagents excluded")
+
+    led = cl.build_ledger(files, samples=10, max_sessions=100, hook_owners={"cmd-a": "alpha"},
+                          skill_descs={}, tokens_per_byte=0.25)
+    src = led["sources"]
+    _assert(src["skill_listing"]["samples"] == 3 and src["skill_listing"]["median_chars"] == 200, "listing median over 3")
+    _assert(src["skill_listing"]["median_tokens"] == 50, "tokens = chars * tokens_per_byte")
+    _assert(src["skill_listing"]["by_owner"] == {"(local)": 301}, "by_owner from newest listing (300 chars + newline)")
+    _assert(src["instructions"]["samples"] == 2, "instructions sampled only where present")
+    _assert(src["instructions"]["files"][0]["median_chars"] == 80, "per-file median")
+    hc = src["hook_context"]
+    _assert(hc["samples"] == 2, "hook context present in 2 sessions")
+    _assert(hc["median_chars"] == 50, "merged total (70) used for a, per-command sum (30) for b; median 50")
+    _assert(hc["by_owner"] == {"alpha": 40, "unattributed": 20}, "owner medians; unknown command unattributed")
+    _assert(hc["no_context_outputs"] == 1, "JSON without additionalContext tallied")
+    _assert("deferred_tools" in led["missing"] and "deferred_tools" not in src, "absent type listed as missing, not zero")
+
+    print("Test: samples cap stops collecting a type early")
+    led2 = cl.build_ledger(files, samples=1, max_sessions=100, hook_owners={}, skill_descs={}, tokens_per_byte=0.25)
+    _assert(led2["sources"]["skill_listing"]["samples"] == 1 and led2["sources"]["skill_listing"]["median_chars"] == 300,
+            "only newest session used when samples=1")
+
+    print("Test: max_sessions bounds the scan")
+    led3 = cl.build_ledger(files, samples=10, max_sessions=1, hook_owners={}, skill_descs={}, tokens_per_byte=0.25)
+    _assert(led3["scanned_sessions"] == 1, "scan stops at max_sessions")
+
+    print("Test: SDK sessions are skipped by default and counted")
+    sdk = os.path.join(root, "p", "sdk.jsonl")
+    write_session(sdk, [{"type": "user", "entrypoint": "sdk-cli"},
+                        att({"type": "skill_listing", "content": "- s: " + "d" * 995, "skillCount": 1})], mtime=5000)
+    files_sdk = cl.find_sessions(root)
+    led4 = cl.build_ledger(files_sdk, 10, 100, {}, {}, 0.25)
+    _assert(led4["skipped_entrypoints"] == {"sdk-cli": 1}, "sdk session skipped and counted")
+    _assert(led4["sources"]["skill_listing"]["median_chars"] == 200, "sdk listing excluded from median")
+    led5 = cl.build_ledger(files_sdk, 10, 100, {}, {}, 0.25, include_sdk=True)
+    _assert(led5["sources"]["skill_listing"]["samples"] == 4, "include_sdk measures sdk sessions too")
+    os.remove(sdk)
+
+    print("Test: no known record types anywhere raises LedgerFormatError")
+    junk = os.path.join(d, "junk", "p", "j.jsonl")
+    write_session(junk, [{"type": "user", "message": {"content": "hi"}}])
+    try:
+        cl.build_ledger([junk], 10, 100, {}, {}, 0.25)
+        _assert(False, "expected LedgerFormatError")
+    except cl.LedgerFormatError:
+        _assert(True, "unrecognized format fails fast")
+
+
+def test_cli(d):
+    print("Test: main exit codes")
+    empty = os.path.join(d, "only-sub")
+    write_session(os.path.join(empty, "p", "s", "subagents", "agent-1.jsonl"),
+                  [att({"type": "skill_listing", "content": "- a", "skillCount": 1})])
+    cfg = os.path.join(d, "cfg-empty")
+    os.makedirs(cfg, exist_ok=True)
+    _assert(cl.main(["x", "--projects-dir", empty, "--config-dir", cfg, "--json"]) == 1, "only subagent transcripts -> exit 1")
+    _assert(cl.main(["x", "--projects-dir", os.path.join(d, "nope"), "--config-dir", cfg]) == 1, "missing projects dir -> exit 1")
+    _assert(cl.main(["x", "--samples"]) == 2, "missing flag value -> exit 2")
+    sdk_only = os.path.join(d, "sdk-only")
+    write_session(os.path.join(sdk_only, "p", "s.jsonl"),
+                  [{"type": "user", "entrypoint": "sdk-py"}, att({"type": "skill_listing", "content": "- a", "skillCount": 1})])
+    _assert(cl.main(["x", "--projects-dir", sdk_only, "--config-dir", cfg]) == 1, "only sdk sessions -> exit 1")
+    _assert(cl.main(["x", "--projects-dir", sdk_only, "--config-dir", cfg, "--include-sdk"]) == 0, "--include-sdk measures them")
+    good = os.path.join(d, "projects")
+    _assert(cl.main(["x", "--projects-dir", good, "--config-dir", cfg]) == 0, "markdown run succeeds")
+
+
 def run():
     with tempfile.TemporaryDirectory() as d:
         test_extract_session(d)
         test_skill_overflow(d)
         test_hook_owners(d)
+        test_build_ledger(d)
+        test_cli(d)
     print("All context-ledger tests passed.")
 
 

@@ -264,3 +264,215 @@ def load_hook_owners(config_dir):
             for cmd in _hook_commands(json.load(f).get("hooks")):
                 owners.setdefault(cmd, set()).add("settings.json")
     return {cmd: ", ".join(sorted(names)) for cmd, names in owners.items()}
+
+
+SIMPLE_SOURCES = ("skill_listing", "deferred_tools", "mcp_instructions", "agent_listing")
+ALL_SOURCES = SIMPLE_SOURCES + ("hook_context", "instructions")
+
+
+class LedgerFormatError(Exception):
+    pass
+
+
+def find_sessions(projects_dir):
+    """Main-session transcripts, newest first. Subagent transcripts sit deeper and are excluded."""
+    files = glob.glob(os.path.join(projects_dir, "*", "*.jsonl"))
+    return sorted(files, key=os.path.getmtime, reverse=True)
+
+
+def _median(values):
+    return int(round(statistics.median(values)))
+
+
+def _session_hook_context(s, hook_owners):
+    """(total_chars, {owner: chars}, no_context_count, unparsed_count) or None if no hook data."""
+    hooks = s.get("hooks") or []
+    if "hook_merged" not in s and not hooks:
+        return None
+    by_owner = {}
+    for h in hooks:
+        if h["status"] == "context":
+            owner = hook_owners.get(h["command"], "unattributed")
+            by_owner[owner] = by_owner.get(owner, 0) + h["chars"]
+    total = s["hook_merged"]["chars"] if "hook_merged" in s else sum(by_owner.values())
+    no_ctx = sum(1 for h in hooks if h["status"] == "no_context")
+    unparsed = sum(1 for h in hooks if h["status"] == "unparsed")
+    return total, by_owner, no_ctx, unparsed
+
+
+def build_ledger(files, samples, max_sessions, hook_owners, skill_descs, tokens_per_byte, include_sdk=False):
+    collected = {k: [] for k in ALL_SOURCES}
+    format_errors = []
+    skipped = {}
+    scanned = 0
+    for path in files:
+        if scanned >= max_sessions or all(len(v) >= samples for v in collected.values()):
+            break
+        ep = session_entrypoint(path)
+        if not include_sdk and ep and ep.startswith("sdk-"):
+            skipped[ep] = skipped.get(ep, 0) + 1
+            continue
+        scanned += 1
+        s = extract_session(path)
+        format_errors.extend(s["format_errors"])
+        for key in SIMPLE_SOURCES:
+            if key in s and len(collected[key]) < samples:
+                collected[key].append(s[key])
+        hc = _session_hook_context(s, hook_owners)
+        if hc is not None and len(collected["hook_context"]) < samples:
+            collected["hook_context"].append(hc)
+        if "instructions" in s and len(collected["instructions"]) < samples:
+            collected["instructions"].append(s["instructions"])
+
+    if scanned and not any(collected.values()):
+        raise LedgerFormatError(
+            f"transcript format not recognized; context ledger unavailable "
+            f"(no known attachment records in {scanned} sessions)")
+
+    tok = lambda chars: int(round(chars * tokens_per_byte))
+
+    def base(rows):
+        m = _median([r["chars"] for r in rows])
+        return {"samples": len(rows), "median_chars": m, "median_tokens": tok(m)}
+
+    def median_map(maps):
+        keys = {k for m in maps for k in m}
+        return {k: _median([m[k] for m in maps if k in m]) for k in sorted(keys)}
+
+    sources = {}
+    if collected["skill_listing"]:
+        rows = collected["skill_listing"]
+        sources["skill_listing"] = dict(base(rows),
+                                        skill_count=rows[0]["skill_count"],
+                                        dropped=dropped_skills(rows[0]["content"], skill_descs),
+                                        by_owner=listing_chars_by_owner(rows[0]["content"]))
+    if collected["deferred_tools"]:
+        rows = collected["deferred_tools"]
+        sources["deferred_tools"] = dict(base(rows),
+                                         median_names=_median([r["names"] for r in rows]),
+                                         by_server=median_map([r["by_server"] for r in rows]))
+    if collected["mcp_instructions"]:
+        rows = collected["mcp_instructions"]
+        sources["mcp_instructions"] = dict(base(rows), by_server=median_map([r["by_server"] for r in rows]))
+    if collected["agent_listing"]:
+        sources["agent_listing"] = base(collected["agent_listing"])
+    if collected["hook_context"]:
+        rows = collected["hook_context"]
+        m = _median([r[0] for r in rows])
+        sources["hook_context"] = {"samples": len(rows), "median_chars": m, "median_tokens": tok(m),
+                                   "by_owner": median_map([r[1] for r in rows]),
+                                   "no_context_outputs": sum(r[2] for r in rows),
+                                   "unparsed_outputs": sum(r[3] for r in rows)}
+    if collected["instructions"]:
+        per_path = {}
+        for session_files in collected["instructions"]:
+            for f in session_files:
+                per_path.setdefault(f["path"], {"type": f["type"], "chars": []})["chars"].append(f["chars"])
+        files_out = []
+        for p, v in sorted(per_path.items()):
+            m = _median(v["chars"])
+            files_out.append({"path": p, "type": v["type"], "samples": len(v["chars"]),
+                              "median_chars": m, "median_tokens": tok(m)})
+        sources["instructions"] = {"samples": len(collected["instructions"]), "files": files_out}
+
+    return {"scanned_sessions": scanned, "skipped_entrypoints": skipped,
+            "tokens_per_byte": tokens_per_byte, "sources": sources,
+            "missing": [k for k in ALL_SOURCES if k not in sources], "format_errors": format_errors}
+
+
+def _top(mapping, n=10):
+    return sorted(mapping.items(), key=lambda kv: -kv[1])[:n]
+
+
+def render_markdown(ledger):
+    src = ledger["sources"]
+    lines = ["# Measured Context Ledger", "",
+             f"Sessions scanned: {ledger['scanned_sessions']}"
+             + (" (skipped non-interactive: " + ", ".join(f"{k} {v}" for k, v in sorted(ledger["skipped_entrypoints"].items())) + ")"
+                if ledger["skipped_entrypoints"] else ""), "",
+             "| Source | Samples | ~Chars | ~Tokens |", "|---|---|---|---|"]
+    labels = {"skill_listing": "Skill listing", "deferred_tools": "Deferred tool names",
+              "mcp_instructions": "MCP server instructions", "agent_listing": "Agent listing",
+              "hook_context": "SessionStart hook context"}
+    for key, label in labels.items():
+        if key in src:
+            r = src[key]
+            lines.append(f"| {label} | {r['samples']} | {r['median_chars']:,} | {r['median_tokens']:,} |")
+    for f in (src.get("instructions") or {}).get("files", []):
+        lines.append(f"| {f['type']}: {f['path']} | {f['samples']} | {f['median_chars']:,} | {f['median_tokens']:,} |")
+    if ledger["missing"]:
+        lines += ["", "Not present in transcripts: " + ", ".join(ledger["missing"])]
+    for key, title, field in (("skill_listing", "Skill listing by plugin", "by_owner"),
+                              ("deferred_tools", "Deferred tool names by server", "by_server"),
+                              ("mcp_instructions", "MCP instructions by server", "by_server"),
+                              ("hook_context", "Hook context by owner", "by_owner")):
+        if key in src and src[key][field]:
+            lines += ["", f"## {title}", "", "| Name | ~Chars |", "|---|---|"]
+            lines += [f"| {k} | {v:,} |" for k, v in _top(src[key][field])]
+    dropped = (src.get("skill_listing") or {}).get("dropped") or []
+    if dropped:
+        lines += ["", "## Skills listed without descriptions", "",
+                  "The skill listing hit its size budget; these skills appear by name only, "
+                  "so Claude cannot match them to a request.", ""]
+        lines += [f"- {x['name']} ({x['reason']})" for x in dropped]
+    if ledger["format_errors"]:
+        lines += ["", "## Unparseable records", ""] + [f"- {e}" for e in ledger["format_errors"]]
+    return "\n".join(lines)
+
+
+def main(argv):
+    opts = {"--projects-dir": PROJECTS_DIR, "--config-dir": CONFIG_DIR,
+            "--samples": "10", "--max-sessions": "100", "--tokens-per-byte": "0.25"}
+    as_json = False
+    include_sdk = False
+    args = argv[1:]
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a == "--json":
+            as_json = True
+        elif a == "--include-sdk":
+            include_sdk = True
+        elif a in opts:
+            i += 1
+            if i >= len(args):
+                sys.stderr.write(f"error: {a} requires a value\n")
+                return 2
+            opts[a] = args[i]
+        else:
+            sys.stderr.write(f"error: unknown argument {a}\n")
+            return 2
+        i += 1
+    try:
+        samples = int(opts["--samples"])
+        max_sessions = int(opts["--max-sessions"])
+        tpb = float(opts["--tokens-per-byte"])
+    except ValueError as e:
+        sys.stderr.write(f"error: {e}\n")
+        return 2
+
+    projects_dir = opts["--projects-dir"]
+    if not os.path.isdir(projects_dir):
+        sys.stderr.write(f"error: projects dir not found: {projects_dir}\n")
+        return 1
+    files = find_sessions(projects_dir)
+    if not files:
+        sys.stderr.write(f"error: no main-session transcripts under {projects_dir}\n")
+        return 1
+    config_dir = opts["--config-dir"]
+    try:
+        ledger = build_ledger(files, samples, max_sessions, load_hook_owners(config_dir),
+                              load_skill_descriptions(config_dir), tpb, include_sdk=include_sdk)
+    except LedgerFormatError as e:
+        sys.stderr.write(f"error: {e}\n")
+        return 2
+    if ledger["scanned_sessions"] == 0:
+        sys.stderr.write(f"error: no interactive sessions among {len(files)} transcripts "
+                         f"(skipped: {ledger['skipped_entrypoints']}); pass --include-sdk to measure them\n")
+        return 1
+    print(json.dumps(ledger, indent=2) if as_json else render_markdown(ledger))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
