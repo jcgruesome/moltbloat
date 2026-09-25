@@ -146,3 +146,85 @@ def extract_session(path):
     if hooks:
         s["hooks"] = hooks
     return s
+
+
+SKILL_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]+(:[A-Za-z0-9_.-]+)?$")
+
+
+def parse_skill_listing(content):
+    """[(name, listed_with_description)] for each `- name[: description]` line.
+
+    Lines not starting with `- `, or whose name is not a valid skill name, are
+    description continuations and are skipped.
+    """
+    entries = []
+    for line in content.split("\n"):
+        if not line.startswith("- "):
+            continue
+        name, sep, desc = line[2:].partition(": ")
+        name = name.strip()
+        if not SKILL_NAME_RE.match(name):
+            continue
+        entries.append((name, bool(sep and desc.strip())))
+    return entries
+
+
+def _skill_has_description(skill_md):
+    with open(skill_md, "r", encoding="utf-8", errors="replace") as f:
+        text = f.read()
+    if not text.startswith("---"):
+        return False
+    end = text.find("\n---", 3)
+    if end == -1:
+        return False
+    for line in text[3:end].splitlines():
+        if line.startswith("description:"):
+            return line[len("description:"):].strip() not in ("", '""', "''")
+    return False
+
+
+def load_skill_descriptions(config_dir):
+    """Map every locally installed skill name to whether its SKILL.md has a description."""
+    descs = {}
+    manifest = os.path.join(config_dir, "plugins", "installed_plugins.json")
+    if os.path.isfile(manifest):
+        with open(manifest, encoding="utf-8") as f:
+            plugins = (json.load(f).get("plugins") or {})
+        for key, entries in plugins.items():
+            plugin = key.split("@", 1)[0]
+            for entry in entries or []:
+                install = (entry or {}).get("installPath")
+                if not install:
+                    continue
+                for md in glob.glob(os.path.join(install, "skills", "*", "SKILL.md")):
+                    descs[f"{plugin}:{os.path.basename(os.path.dirname(md))}"] = _skill_has_description(md)
+    for md in glob.glob(os.path.join(config_dir, "skills", "*", "SKILL.md")):
+        descs[os.path.basename(os.path.dirname(md))] = _skill_has_description(md)
+    return descs
+
+
+def listing_chars_by_owner(content):
+    """Skill listing chars per owning plugin; unprefixed skills are "(local)"."""
+    out = {}
+    owner = None
+    for line in content.split("\n"):
+        if line.startswith("- "):
+            name = line[2:].partition(": ")[0].strip()
+            if SKILL_NAME_RE.match(name):
+                owner = name.split(":", 1)[0] if ":" in name else "(local)"
+        if owner is not None:
+            out[owner] = out.get(owner, 0) + len(line) + 1
+    return out
+
+
+def dropped_skills(content, skill_descs):
+    """Bare listing entries for skills that have a description Claude never saw."""
+    out = []
+    for name, described in parse_skill_listing(content):
+        if described:
+            continue
+        if name not in skill_descs:
+            out.append({"name": name, "reason": "source_not_found"})
+        elif skill_descs[name]:
+            out.append({"name": name, "reason": "has_description"})
+    return out

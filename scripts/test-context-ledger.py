@@ -111,9 +111,62 @@ def test_extract_session(d):
     _assert(s3["hook_merged"]["chars"] == 3, "plain string content accepted")
 
 
+def write_skill(root, name, description):
+    os.makedirs(os.path.join(root, name), exist_ok=True)
+    fm = f"description: {description}\n" if description is not None else ""
+    with open(os.path.join(root, name, "SKILL.md"), "w") as f:
+        f.write(f"---\nname: {name}\n{fm}---\n\nBody.\n")
+
+
+def test_skill_overflow(d):
+    print("Test: parse_skill_listing splits named entries from bare ones")
+    content = ("- api-design: REST patterns\n"
+               "- tool:setup: Configure it\n"
+               "  continued line of a description\n"
+               "- tool:bare\n"
+               "- - not a skill, a markdown bullet inside a description\n"
+               "- local-bare")
+    entries = cl.parse_skill_listing(content)
+    _assert(("api-design", True) in entries, "described entry")
+    _assert(("tool:setup", True) in entries, "plugin:skill entry keeps colon in name")
+    _assert(("tool:bare", False) in entries, "bare plugin entry")
+    _assert(("local-bare", False) in entries, "bare local entry")
+
+    print("Test: load_skill_descriptions reads plugin and local SKILL.md frontmatter")
+    config_dir = os.path.join(d, "cfg")
+    install = os.path.join(d, "cache", "tool", "1.0.0")
+    write_skill(os.path.join(install, "skills"), "setup", "Configure it")
+    write_skill(os.path.join(install, "skills"), "bare", "Has one on disk")
+    write_skill(os.path.join(install, "skills"), "empty", None)
+    os.makedirs(os.path.join(config_dir, "plugins"), exist_ok=True)
+    with open(os.path.join(config_dir, "plugins", "installed_plugins.json"), "w") as f:
+        json.dump({"plugins": {"tool@market": [{"installPath": install}]}}, f)
+    write_skill(os.path.join(config_dir, "skills"), "local-bare", "Local desc")
+    descs = cl.load_skill_descriptions(config_dir)
+    _assert(descs.get("tool:setup") is True and descs.get("tool:bare") is True, "plugin skills keyed plugin:skill")
+    _assert(descs.get("tool:empty") is False, "missing description recorded as False")
+    _assert(descs.get("local-bare") is True, "local skill keyed by bare name")
+
+    print("Test: dropped_skills reports bare entries that do have descriptions")
+    dropped = cl.dropped_skills(content + "\n- tool:empty\n- ghost:skill", descs)
+    names = {x["name"]: x["reason"] for x in dropped}
+    _assert(names.get("tool:bare") == "has_description", "bare plugin skill with description is dropped")
+    _assert(names.get("local-bare") == "has_description", "bare local skill with description is dropped")
+    _assert("tool:empty" not in names, "skill with no description is not a finding")
+    _assert(names.get("ghost:skill") == "source_not_found", "unknown bare skill reported as source_not_found")
+    _assert(not any(n.startswith("-") for n in names), "markdown bullet in a description is not a skill")
+
+    print("Test: listing_chars_by_owner attributes lines, including continuations")
+    by_owner = cl.listing_chars_by_owner("- tool:a: desc\n  more\n- b: x\n- tool:c")
+    _assert(by_owner == {"tool": len("- tool:a: desc") + 1 + len("  more") + 1 + len("- tool:c") + 1,
+                         "(local)": len("- b: x") + 1},
+            "chars grouped by plugin prefix, continuation lines follow their entry")
+
+
 def run():
     with tempfile.TemporaryDirectory() as d:
         test_extract_session(d)
+        test_skill_overflow(d)
     print("All context-ledger tests passed.")
 
 
