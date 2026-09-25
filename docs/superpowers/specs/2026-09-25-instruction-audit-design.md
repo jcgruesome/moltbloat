@@ -59,6 +59,14 @@ sampling is per type: keep scanning until each type has
 (default 100) have been scanned, whichever comes first. Each row reports its
 own sample count.
 
+Only interactive sessions count by default: sessions whose `entrypoint` starts
+with `sdk-` (automated runs, many spawned by plugins; 94 of the 104 newest
+transcripts on the author's machine) are skipped and their counts reported,
+with `--include-sdk` to measure them. The `*_delta` records arrive several
+times per session (MCP servers connect late, entries are removed and re-added),
+so they are measured as the union of added entries keyed by name, not the
+first record.
+
 | Attachment `type` | Field used | Ledger row |
 |---|---|---|
 | `instructions` | `files[].path`, `.type`, `.content` length | one row per loaded instruction file |
