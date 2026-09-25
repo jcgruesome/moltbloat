@@ -100,3 +100,6 @@ jobs:
           python3 scripts/init-config.py --init
           python3 scripts/init-config.py --get thresholds.token_warning
           python3 scripts/init-config.py --dump > /dev/null
+
+      - name: Run context ledger tests
+        run: python3 scripts/test-context-ledger.py

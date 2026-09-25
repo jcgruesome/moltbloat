@@ -69,6 +69,14 @@ def run():
     ic.migrate_config({"version": "1.3", "costs": {"opus_per_1m_tokens": 15.00}})
     _assert(ic.DEFAULT_CONFIG["costs"] == before, "DEFAULT_CONFIG['costs'] unchanged after migrate_config")
 
+    print("Test: context ledger thresholds have defaults and migrate in")
+    th = ic.DEFAULT_CONFIG["thresholds"]
+    _assert(th["context_ledger_samples"] == 10, "context_ledger_samples default 10")
+    _assert(th["context_ledger_max_sessions"] == 100, "context_ledger_max_sessions default 100")
+    migrated_th = ic.migrate_config({"version": "1.4", "thresholds": {"token_warning": 1}})["thresholds"]
+    _assert(migrated_th["context_ledger_samples"] == 10 and migrated_th["token_warning"] == 1,
+            "migration adds new keys and keeps customized ones")
+
     print("\nAll tests passed.")
 
 

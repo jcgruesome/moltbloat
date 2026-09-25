@@ -114,6 +114,7 @@ Customize thresholds, costs, and defaults in `~/.moltbloat/config.json`:
 
 ## What it checks
 
+- **Measured context**: reads what each session actually loaded from Claude Code's transcripts (skill listing, deferred MCP tool names, MCP instructions, agent listing, SessionStart hook output, instruction files) instead of estimating, and flags skills whose descriptions were dropped because the listing hit its size budget.
 - **Plugins**: disabled, zero-skill, stale cache versions
 - **MCP servers**: duplicates of native features or other plugins, including org-managed `managedMcpServers`
 - **Claude.ai connectors**: org-managed connectors overlapping a local plugin/MCP

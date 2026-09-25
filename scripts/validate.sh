@@ -150,6 +150,13 @@ else
   ((ERRORS++))
 fi
 
+if python3 -m py_compile "$PLUGIN_ROOT/scripts/context-ledger.py" 2>/dev/null; then
+  echo "  ✓ context-ledger.py: syntax valid"
+else
+  echo "  ✗ context-ledger.py: syntax errors"
+  ((ERRORS++))
+fi
+
 echo ""
 echo "Running unit tests..."
 
@@ -166,6 +173,14 @@ if python3 "$PLUGIN_ROOT/scripts/test-init-config.py" >/dev/null 2>&1; then
   echo "  ✓ test-init-config.py: all assertions pass"
 else
   echo "  ✗ test-init-config.py: FAILED"
+  ((ERRORS++))
+fi
+
+# context-ledger: deterministic fixture-based test
+if python3 "$PLUGIN_ROOT/scripts/test-context-ledger.py" >/dev/null 2>&1; then
+  echo "  ✓ test-context-ledger.py: all assertions pass"
+else
+  echo "  ✗ test-context-ledger.py: FAILED"
   ((ERRORS++))
 fi
 

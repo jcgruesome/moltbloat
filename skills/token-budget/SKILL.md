@@ -34,6 +34,8 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get costs
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get estimates
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get thresholds.token_warning
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get thresholds.context_ledger_samples
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get thresholds.context_ledger_max_sessions
    ```
 
    Use these values for calculations:
@@ -49,6 +51,30 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
    For each category below, measure the byte size of all files that get injected into context. Use `wc -c` for accuracy. Estimate tokens using `tokens_per_byte` from config (default: 0.25, i.e., bytes / 4).
 
    Run all measurements in parallel.
+
+   **2.0 Measured context ledger (run first)**
+
+   Claude Code records what it injected at session start in the transcripts.
+   Measure that directly:
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/context-ledger.py" --json \
+     --samples <context_ledger_samples> --max-sessions <context_ledger_max_sessions> \
+     --tokens-per-byte <tokens_per_byte>
+   ```
+
+   - Exit 0: use `sources.*.median_tokens` for every source it reports
+     (skill listing, deferred tool names, MCP server instructions, agent
+     listing, SessionStart hook context, and each instruction file). These
+     replace the estimates in 2a, 2d, 2e, 2f, and 2g for those sources.
+   - Sources in `missing`: fall back to the estimate for that source only,
+     and mark its row "est.".
+   - Exit 1 (no transcripts) or 2 (format not recognized): tell the user
+     the ledger is unavailable and why (quote stderr), then use estimates
+     for every row, all marked "est.". Do not hide this.
+
+   The 2a to 2g measurements below still run: they supply rows the ledger
+   does not cover (per-plugin breakdown, rules not seen loaded) and the
+   fallbacks above.
 
    **2a. CLAUDE.md files**
    These are always loaded into context:
@@ -103,7 +129,7 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
      echo "$plugin: $mcp_file"
    done
    ```
-   Note: Each MCP tool definition is approximately 200-500 tokens for the name + description + parameter schema. Multiply tool count by 350 (midpoint estimate).
+   Note: Each MCP tool definition is approximately 200-500 tokens for the name + description + parameter schema. Only used when the ledger reports `deferred_tools` missing. With deferred tools, only names are in context until a tool is loaded, so this estimate overstates cost; label it est.
 
    **2e. Skill metadata**
    Skills are listed in system reminders. Each skill listing is roughly one line (~100 chars = ~25 tokens):
@@ -149,26 +175,44 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
 
    ## Breakdown by Source
 
-   | Source | Bytes | ~Tokens | % of Window | Notes |
-   |--------|-------|---------|-------------|-------|
-   | CLAUDE.md (global) | X | X | X% | Always loaded |
-   | CLAUDE.md (project) | X | X | X% | Per-project |
-   | Rules (common) | X | X | X% | Always loaded |
-   | Rules (typescript) | X | X | X% | Language-specific |
-   | Rules (python) | X | X | X% | Language-specific |
-   | ... | ... | ... | ... | ... |
+   | Source | Bytes | ~Tokens | % of Window | Measured? | Notes |
+   |--------|-------|---------|-------------|-----------|-------|
+   | CLAUDE.md (global) | X | X | X% | est. | Always loaded |
+   | CLAUDE.md (project) | X | X | X% | est. | Per-project |
+   | Rules (common) | X | X | X% | est. | Always loaded |
+   | Rules (typescript) | X | X | X% | est. | Language-specific |
+   | Rules (python) | X | X | X% | est. | Language-specific |
+   | ... | ... | ... | ... | ... | ... |
    <one row per installed plugin with actual byte/token measurements>
-   | ... | ... | ... | ... | ... |
-   | MCP tools (~N tools) | - | X | X% | Tool schemas in context |
-   | Skill listings (~N skills) | - | X | X% | Skill menu |
-   | Agent definitions (N agents) | X | X | X% | Agent descriptions |
-   | Hook definitions | X | X | X% | Static cost only |
-   | **TOTAL** | **X** | **X** | **X%** | |
+   | ... | ... | ... | ... | ... | ... |
+   | Skill listing (N skills) | - | X | X% | measured (N) | Listed every turn |
+   | Deferred tool names (N names) | - | X | X% | measured (N) | Names only; schemas load on use |
+   | MCP server instructions | - | X | X% | measured (N) | Per-server instruction blocks |
+   | Agent listing | - | X | X% | measured (N) | Agent types and descriptions |
+   | SessionStart hook context | - | X | X% | measured (N) | Injected once per session |
+   | **TOTAL** | **X** | **X** | **X%** | | |
+
+   **Note**: "Measured?" is `measured (N sessions)` using the ledger row's
+   `samples` count, or `est.` when the source is in `missing` and the row
+   falls back to the 2a to 2g estimate.
 
    ## Top 5 Token Consumers
    1. <source> — X tokens (Y%)
    2. <source> — X tokens (Y%)
    3. ...
+
+   ## Where the ledger points
+
+   - Top 5 servers by deferred-name chars and by MCP instruction chars
+     (from `by_server`), top 5 plugins by skill listing chars
+     (`skill_listing.by_owner`), and hook context by owner
+     (`hook_context.by_owner`), each named so the user can disable it.
+   - If `sources.skill_listing.dropped` is non-empty: "Your skill listing
+     hit its size budget. N skills appear by name only, so Claude cannot
+     match them to a request:" then the names. Suggest disabling unused
+     skill-heavy plugins (see `/moltbloat:usage`).
+   - If `hook_context.unparsed_outputs` > 0: note that some SessionStart
+     hooks print non-JSON output, which is not counted as context.
 
    ## Cost in Dollars
 
