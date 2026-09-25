@@ -177,24 +177,35 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
 
    | Source | Bytes | ~Tokens | % of Window | Measured? | Notes |
    |--------|-------|---------|-------------|-----------|-------|
-   | CLAUDE.md (global) | X | X | X% | est. | Always loaded |
-   | CLAUDE.md (project) | X | X | X% | est. | Per-project |
+   | CLAUDE.md (global) | X | X | X% | measured (N) / est. | Always loaded |
+   | CLAUDE.md (project) | X | X | X% | measured (N) / est. | Per-project |
    | Rules (common) | X | X | X% | est. | Always loaded |
    | Rules (typescript) | X | X | X% | est. | Language-specific |
    | Rules (python) | X | X | X% | est. | Language-specific |
    | ... | ... | ... | ... | ... | ... |
    <one row per installed plugin with actual byte/token measurements>
    | ... | ... | ... | ... | ... | ... |
-   | Skill listing (N skills) | - | X | X% | measured (N) | Listed every turn |
-   | Deferred tool names (N names) | - | X | X% | measured (N) | Names only; schemas load on use |
-   | MCP server instructions | - | X | X% | measured (N) | Per-server instruction blocks |
-   | Agent listing | - | X | X% | measured (N) | Agent types and descriptions |
-   | SessionStart hook context | - | X | X% | measured (N) | Injected once per session |
+   <one row per other file in `sources.instructions.files` not already
+   covered above, e.g. an AutoMem `MEMORY.md` or an ancestor-directory
+   `CLAUDE.md`>
+   | Skill listing (N skills) | - | X | X% | measured (N) / est. | Listed every turn |
+   | Deferred tool names (N names) | - | X | X% | measured (N) / est. | Names only; schemas load on use |
+   | MCP server instructions | - | X | X% | measured (N) / est. | Per-server instruction blocks |
+   | Agent listing | - | X | X% | measured (N) / est. | Agent types and descriptions |
+   | SessionStart hook context | - | X | X% | measured (N) / est. | Injected once per session |
    | **TOTAL** | **X** | **X** | **X%** | | |
 
    **Note**: "Measured?" is `measured (N sessions)` using the ledger row's
-   `samples` count, or `est.` when the source is in `missing` and the row
-   falls back to the 2a to 2g estimate.
+   `samples` count when the ledger reports that source, or `est.` when the
+   source is in `missing` and the row falls back to the 2a to 2g estimate.
+   For CLAUDE.md (global) and CLAUDE.md (project), check whether
+   `sources.instructions.files` includes that exact path: if it does, use
+   that file's `median_tokens` and mark `measured (N)`; if not, keep the 2a
+   byte-count estimate and mark `est.`. Add one further row for every other
+   file `sources.instructions.files` reports that isn't CLAUDE.md (global)
+   or (project) (an AutoMem `MEMORY.md`, an ancestor-directory `CLAUDE.md`,
+   and so on); those rows are always `measured (N)` since they only appear
+   when the ledger actually found the file.
 
    ## Top 5 Token Consumers
    1. <source> — X tokens (Y%)
