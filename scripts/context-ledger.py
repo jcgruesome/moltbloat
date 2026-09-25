@@ -14,6 +14,11 @@ Usage:
   python3 context-ledger.py [--projects-dir DIR] [--config-dir DIR]
                             [--samples N] [--max-sessions N]
                             [--tokens-per-byte F] [--include-sdk] [--json]
+                            [--project PATH]
+
+--project PATH restricts the `instructions` source (CLAUDE.md and friends)
+to sessions whose recorded cwd is PATH or a subdirectory of it. All other
+sources stay global (every sampled interactive session).
 """
 import glob
 import json
@@ -37,9 +42,11 @@ def hook_context_len(stdout):
     """Classify a SessionStart hook's stdout.
 
     Only JSON `hookSpecificOutput.additionalContext` is injected as context.
-    Returns ("context", n), ("no_context", 0) for JSON without it, or
-    ("unparsed", 0) for non-JSON output.
+    Returns ("context", n), ("no_context", 0) for JSON without it (including
+    empty stdout), or ("unparsed", 0) for non-JSON output.
     """
+    if stdout == "":
+        return ("no_context", 0)
     try:
         obj = json.loads(stdout)
     except (TypeError, ValueError):
@@ -87,6 +94,22 @@ def session_entrypoint(path):
     return None
 
 
+def session_cwd(path):
+    """The session's working directory: `cwd` of the first transcript line that has one."""
+    with open(path, "r", encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            if '"cwd"' not in line:
+                continue
+            try:
+                obj = json.loads(line)
+            except ValueError:
+                continue
+            cwd = obj.get("cwd") if isinstance(obj, dict) else None
+            if cwd:
+                return cwd
+    return None
+
+
 def _aligned(a, keys_field, values_field, kind, path, errors):
     keys = a.get(keys_field) or []
     values = a.get(values_field) or []
@@ -98,7 +121,7 @@ def _aligned(a, keys_field, values_field, kind, path, errors):
 
 def extract_session(path):
     """Measure one main-session transcript (per-session rules in the plan)."""
-    s = {"format_errors": [], "entrypoint": session_entrypoint(path)}
+    s = {"format_errors": [], "entrypoint": session_entrypoint(path), "cwd": session_cwd(path)}
     deferred, mcp, agents = {}, {}, {}
     hook_batch = None
     hooks = []
@@ -108,9 +131,9 @@ def extract_session(path):
             content = a.get("content") or ""
             s["skill_listing"] = {"chars": len(content), "skill_count": a.get("skillCount"), "content": content}
         elif kind == "deferred_tools_delta":
-            names = a.get("addedNames") or []
             if "addedLines" not in a:
-                a = dict(a, addedLines=names)
+                s["format_errors"].append(f"deferred_tools_delta: missing addedLines in {path}")
+                continue
             deferred.update(_aligned(a, "addedNames", "addedLines", kind, path, s["format_errors"]))
         elif kind == "mcp_instructions_delta":
             mcp.update(_aligned(a, "addedNames", "addedBlocks", kind, path, s["format_errors"]))
@@ -121,7 +144,8 @@ def extract_session(path):
                 {"path": f.get("path"), "type": f.get("type"), "chars": len(f.get("content") or "")}
                 for f in a.get("files") or [] if isinstance(f, dict)
             ]
-        elif kind == "hook_additional_context" and "hook_merged" not in s:
+        elif (kind == "hook_additional_context" and "hook_merged" not in s
+              and a.get("hookEvent") in (None, "SessionStart")):
             content = a.get("content")
             parts = content if isinstance(content, list) else [content or ""]
             s["hook_merged"] = {"chars": sum(len(x) for x in parts if isinstance(x, str))}
@@ -300,11 +324,13 @@ def _session_hook_context(s, hook_owners):
     return total, by_owner, no_ctx, unparsed
 
 
-def build_ledger(files, samples, max_sessions, hook_owners, skill_descs, tokens_per_byte, include_sdk=False):
+def build_ledger(files, samples, max_sessions, hook_owners, skill_descs, tokens_per_byte,
+                 include_sdk=False, project=None):
     collected = {k: [] for k in ALL_SOURCES}
     format_errors = []
     skipped = {}
     scanned = 0
+    norm_project = os.path.realpath(project) if project else None
     for path in files:
         if scanned >= max_sessions or all(len(v) >= samples for v in collected.values()):
             break
@@ -322,7 +348,14 @@ def build_ledger(files, samples, max_sessions, hook_owners, skill_descs, tokens_
         if hc is not None and len(collected["hook_context"]) < samples:
             collected["hook_context"].append(hc)
         if "instructions" in s and len(collected["instructions"]) < samples:
-            collected["instructions"].append(s["instructions"])
+            if norm_project is None:
+                collected["instructions"].append(s["instructions"])
+            else:
+                cwd = s.get("cwd")
+                if cwd:
+                    ncwd = os.path.realpath(cwd)
+                    if ncwd == norm_project or ncwd.startswith(norm_project + "/"):
+                        collected["instructions"].append(s["instructions"])
 
     if scanned and not any(collected.values()):
         raise LedgerFormatError(
@@ -376,7 +409,7 @@ def build_ledger(files, samples, max_sessions, hook_owners, skill_descs, tokens_
         sources["instructions"] = {"samples": len(collected["instructions"]), "files": files_out}
 
     return {"scanned_sessions": scanned, "skipped_entrypoints": skipped,
-            "tokens_per_byte": tokens_per_byte, "sources": sources,
+            "tokens_per_byte": tokens_per_byte, "project": project, "sources": sources,
             "missing": [k for k in ALL_SOURCES if k not in sources], "format_errors": format_errors}
 
 
@@ -389,8 +422,10 @@ def render_markdown(ledger):
     lines = ["# Measured Context Ledger", "",
              f"Sessions scanned: {ledger['scanned_sessions']}"
              + (" (skipped non-interactive: " + ", ".join(f"{k} {v}" for k, v in sorted(ledger["skipped_entrypoints"].items())) + ")"
-                if ledger["skipped_entrypoints"] else ""), "",
-             "| Source | Samples | ~Chars | ~Tokens |", "|---|---|---|---|"]
+                if ledger["skipped_entrypoints"] else "")]
+    if ledger.get("project"):
+        lines.append(f"Instruction files: sessions in {ledger['project']}")
+    lines += ["", "| Source | Samples | ~Chars | ~Tokens |", "|---|---|---|---|"]
     labels = {"skill_listing": "Skill listing", "deferred_tools": "Deferred tool names",
               "mcp_instructions": "MCP server instructions", "agent_listing": "Agent listing",
               "hook_context": "SessionStart hook context"}
@@ -422,7 +457,8 @@ def render_markdown(ledger):
 
 def main(argv):
     opts = {"--projects-dir": PROJECTS_DIR, "--config-dir": CONFIG_DIR,
-            "--samples": "10", "--max-sessions": "100", "--tokens-per-byte": "0.25"}
+            "--samples": "10", "--max-sessions": "100", "--tokens-per-byte": "0.25",
+            "--project": None}
     as_json = False
     include_sdk = False
     args = argv[1:]
@@ -450,6 +486,12 @@ def main(argv):
     except ValueError as e:
         sys.stderr.write(f"error: {e}\n")
         return 2
+    if samples < 1:
+        sys.stderr.write("error: --samples must be >= 1\n")
+        return 2
+    if max_sessions < 1:
+        sys.stderr.write("error: --max-sessions must be >= 1\n")
+        return 2
 
     projects_dir = opts["--projects-dir"]
     if not os.path.isdir(projects_dir):
@@ -462,7 +504,8 @@ def main(argv):
     config_dir = opts["--config-dir"]
     try:
         ledger = build_ledger(files, samples, max_sessions, load_hook_owners(config_dir),
-                              load_skill_descriptions(config_dir), tpb, include_sdk=include_sdk)
+                              load_skill_descriptions(config_dir), tpb, include_sdk=include_sdk,
+                              project=opts["--project"])
     except LedgerFormatError as e:
         sys.stderr.write(f"error: {e}\n")
         return 2

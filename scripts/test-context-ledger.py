@@ -111,6 +111,33 @@ def test_extract_session(d):
     _assert(s3["hook_merged"]["chars"] == 3, "plain string content accepted")
 
 
+def test_deferred_tools_missing_added_lines(d):
+    print("Test: deferred_tools_delta with no addedLines is a format error, not a silent fallback")
+    p = os.path.join(d, "proj-f6", "s.jsonl")
+    write_session(p, [att({"type": "deferred_tools_delta", "addedNames": ["a", "b"]})])
+    s = cl.extract_session(p)
+    _assert("deferred_tools" not in s, "no addedLines -> not measured")
+    _assert(len(s["format_errors"]) == 1 and "deferred_tools_delta" in s["format_errors"][0],
+            "missing addedLines recorded as a format error")
+
+
+def test_hook_context_len_empty(d):
+    print("Test: hook_context_len classifies empty stdout as no_context")
+    _assert(cl.hook_context_len("") == ("no_context", 0), "empty stdout is no_context, not unparsed")
+
+
+def test_hook_additional_context_event_filter(d):
+    print("Test: hook_additional_context only takes the first SessionStart (or unset) event")
+    p = os.path.join(d, "proj-f10", "s.jsonl")
+    write_session(p, [
+        att({"type": "hook_additional_context", "hookEvent": "PostToolUse", "content": "z" * 50}),
+        att({"type": "hook_additional_context", "content": "y" * 10}),
+        att({"type": "hook_additional_context", "hookEvent": "SessionStart", "content": "w" * 7}),
+    ])
+    s = cl.extract_session(p)
+    _assert(s["hook_merged"]["chars"] == 10, "PostToolUse event skipped; first eligible (unset event) record used")
+
+
 def write_skill(root, name, description):
     os.makedirs(os.path.join(root, name), exist_ok=True)
     fm = f"description: {description}\n" if description is not None else ""
@@ -258,6 +285,62 @@ def test_build_ledger(d):
         _assert(True, "unrecognized format fails fast")
 
 
+def cwd_rec(cwd):
+    return {"type": "user", "cwd": cwd, "message": {"content": "hi"}}
+
+
+def test_project_filter(d):
+    print("Test: extract_session reads cwd from the first record that has one")
+    p = os.path.join(d, "proj-cwd", "s.jsonl")
+    write_session(p, [{"type": "user", "message": {"content": "no cwd here"}}, cwd_rec("/work/projA"),
+                      att({"type": "skill_listing", "content": "- s", "skillCount": 1})])
+    s = cl.extract_session(p)
+    _assert(s["cwd"] == "/work/projA", "cwd read from first record carrying it")
+
+    print("Test: build_ledger --project restricts instructions to matching sessions only")
+    root = os.path.join(d, "proj-filter")
+    recA = [cwd_rec("/work/projA"), att({"type": "skill_listing", "content": "- s: " + "d" * 95, "skillCount": 1}),
+            att({"type": "instructions", "files": [{"path": "/work/projA/CLAUDE.md", "type": "Project", "content": "a" * 40}]})]
+    recASub = [cwd_rec("/work/projA/sub"), att({"type": "skill_listing", "content": "- s: " + "d" * 95, "skillCount": 1}),
+               att({"type": "instructions", "files": [{"path": "/work/projA/CLAUDE.md", "type": "Project", "content": "a" * 60}]})]
+    recB = [cwd_rec("/work/projB"), att({"type": "skill_listing", "content": "- s: " + "d" * 95, "skillCount": 1}),
+            att({"type": "instructions", "files": [{"path": "/work/projB/CLAUDE.md", "type": "Project", "content": "b" * 999}]})]
+    write_session(os.path.join(root, "p", "a.jsonl"), recA, mtime=3000)
+    write_session(os.path.join(root, "p", "a-sub.jsonl"), recASub, mtime=2000)
+    write_session(os.path.join(root, "p", "b.jsonl"), recB, mtime=1000)
+
+    files = cl.find_sessions(root)
+    led = cl.build_ledger(files, samples=10, max_sessions=100, hook_owners={}, skill_descs={},
+                          tokens_per_byte=0.25, project="/work/projA")
+    _assert(led["project"] == "/work/projA", "project echoed at ledger top level")
+    _assert(led["sources"]["instructions"]["samples"] == 2, "instructions only from sessions under projA (incl. subdir)")
+    for f in led["sources"]["instructions"]["files"]:
+        _assert(f["median_chars"] in (40, 50), "projB's 999-char file never enters the projA median")
+    _assert(led["sources"]["skill_listing"]["samples"] == 3, "skill_listing stays global regardless of --project")
+    md = cl.render_markdown(led)
+    _assert("Instruction files: sessions in /work/projA" in md, "markdown notes the project scope")
+
+    print("Test: no --project keeps instructions global and ledger['project'] is None")
+    led2 = cl.build_ledger(files, samples=10, max_sessions=100, hook_owners={}, skill_descs={}, tokens_per_byte=0.25)
+    _assert(led2["project"] is None, "project defaults to None")
+    _assert(led2["sources"]["instructions"]["samples"] == 3, "instructions global without --project")
+    md2 = cl.render_markdown(led2)
+    _assert("Instruction files: sessions in" not in md2, "no project line when unset")
+
+
+def test_render_markdown_content(d):
+    print("Test: render_markdown lists headings for present sources and names missing ones")
+    root = os.path.join(d, "render")
+    listing_session(os.path.join(root, "p", "a.jsonl"), 100, 1000, with_instructions=True)
+    files = cl.find_sessions(root)
+    led = cl.build_ledger(files, samples=10, max_sessions=100, hook_owners={}, skill_descs={}, tokens_per_byte=0.25)
+    md = cl.render_markdown(led)
+    _assert("Skill listing" in md, "present source row appears")
+    _assert("Not present in transcripts:" in md, "missing sources called out")
+    for k in led["missing"]:
+        _assert(k in md, f"missing source {k} named in markdown")
+
+
 def test_cli(d):
     print("Test: main exit codes")
     empty = os.path.join(d, "only-sub")
@@ -268,6 +351,10 @@ def test_cli(d):
     _assert(cl.main(["x", "--projects-dir", empty, "--config-dir", cfg, "--json"]) == 1, "only subagent transcripts -> exit 1")
     _assert(cl.main(["x", "--projects-dir", os.path.join(d, "nope"), "--config-dir", cfg]) == 1, "missing projects dir -> exit 1")
     _assert(cl.main(["x", "--samples"]) == 2, "missing flag value -> exit 2")
+    _assert(cl.main(["x", "--samples", "0"]) == 2, "--samples 0 -> exit 2")
+    _assert(cl.main(["x", "--samples", "-1"]) == 2, "--samples negative -> exit 2")
+    _assert(cl.main(["x", "--max-sessions", "0"]) == 2, "--max-sessions 0 -> exit 2")
+    _assert(cl.main(["x", "--bogus-flag"]) == 2, "unrecognized argument -> exit 2")
     sdk_only = os.path.join(d, "sdk-only")
     write_session(os.path.join(sdk_only, "p", "s.jsonl"),
                   [{"type": "user", "entrypoint": "sdk-py"}, att({"type": "skill_listing", "content": "- a", "skillCount": 1})])
@@ -280,9 +367,14 @@ def test_cli(d):
 def run():
     with tempfile.TemporaryDirectory() as d:
         test_extract_session(d)
+        test_deferred_tools_missing_added_lines(d)
+        test_hook_context_len_empty(d)
+        test_hook_additional_context_event_filter(d)
         test_skill_overflow(d)
         test_hook_owners(d)
         test_build_ledger(d)
+        test_project_filter(d)
+        test_render_markdown_content(d)
         test_cli(d)
     print("All context-ledger tests passed.")
 
