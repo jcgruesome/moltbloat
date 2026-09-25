@@ -33,7 +33,7 @@ confirmation.
 1. On the author's machine, audit reports: the duplicated and drifted
    "Session wrap" sections and the `imported-from:` residue in
    `~/.claude/CLAUDE.md`; the SessionStart hook context per plugin; the skill
-   listing sitting at its size cap; `executor`, `code-reviewer`, `verifier`
+   listing dropping descriptions for the skills past its size budget; `executor`, `code-reviewer`, `verifier`
    having no `model:` pin.
 2. `token-budget` reports measured per-session context by source, taken from
    transcripts, with estimates used only where no transcript data exists and
@@ -67,15 +67,22 @@ writes:
 Output: per source, median chars and tokens per session (using
 `estimates.tokens_per_byte`), plus the file paths that were actually loaded.
 
-Hook attribution: resolve each `command` string against the `hooks/hooks.json`
-of every installed plugin (structural match on the command text with
-`${CLAUDE_PLUGIN_ROOT}` expanded). Unmatched commands are reported as
-"unattributed hook", not guessed.
+Hook attribution: transcripts record `command` unexpanded (literal
+`${CLAUDE_PLUGIN_ROOT}/...`), so match it verbatim against the command strings
+in every installed plugin's `hooks/hooks.json`, then `settings.json` hooks.
+Unmatched commands are reported as "unattributed hook", not guessed.
 
-Listing cap detection: if the skill listing length is within 1% of the maximum
-observed across sessions and identical across sessions, flag
-`skill_listing_at_cap` (the exact cap is not documented, so this is inferred
-from the data and worded that way).
+Skill listing overflow: when the listing hits its size budget, the remaining
+skills appear as a bare `- name` line with no description (observed: 134
+skills, 29,999 chars, the tail listed name-only). Claude cannot route to a
+skill by intent without its description. Detect structurally: parse the
+listing, and for each bare-name entry whose SKILL.md has a non-empty
+`description`, record it as `skill_description_dropped`. Report the count and
+names, plus the plugins contributing the most listing chars. The budget value
+itself is undocumented; report the observed length, not a claimed limit.
+
+Rows are grouped per project where the source is per-project (project
+CLAUDE.md, rules); user-level sources are aggregated across all sessions.
 
 These attachment shapes are undocumented internals. If none of the recent
 transcripts contain any known attachment type, the script exits non-zero with
@@ -116,7 +123,9 @@ Checks (all structural):
 | `duplicate_section` | two sections (split on headers, normalized) with body similarity >= 0.95, within or across files | MEDIUM |
 | `drifted_duplicate` | same normalized heading or body similarity 0.6 to 0.95; shows the differing lines | HIGH (two versions of one instruction is a conflict) |
 | `import_residue` | `<!-- imported-from: ... -->` markers left by `claude import` | LOW |
-| `delegation_prose_conflict` | prose naming a model tier for an agent type that contradicts that agent's `model:` frontmatter (uses component 5's agent inventory) | MEDIUM |
+
+Sections under 5 body lines are not compared, to avoid pairing short
+unrelated sections.
 
 The caps word list is a list of English emphasis words, not of plugin names, so
 it does not break the "no curated opinion lists" principle.
@@ -125,8 +134,10 @@ it does not break the "no curated opinion lists" principle.
 
 - removes exact duplicate sections (keeps the first occurrence)
 - removes `imported-from` marker comments
-- lowercases emphasis words to normal phrasing and drops shout tags, keeping
-  the sentence otherwise intact
+- softens emphasis: drops leading `IMPORTANT:` / `CRITICAL:` style prefixes
+  and shout tags, and lowercases all-caps imperatives mid-sentence
+  (`you MUST run` becomes `you must run`); sentence content is otherwise
+  untouched
 
 Drifted duplicates are never auto-merged. The diff leaves both, and `clean`
 asks which version to keep (or to keep both).
@@ -144,7 +155,9 @@ Subagent runs live in `<session>/subagents/agent-<id>.jsonl` with a sibling
 
 - per `agentType` x `model`: run count, input/output/cache-write/cache-read
   tokens (from `message.usage`), dollar cost via `costs.*` and the cache
-  multipliers already in config
+  multipliers already in config. Price from each message's `message.model`
+  (full id, e.g. `claude-sonnet-5`); `meta.json` `model` is only an alias
+  (`sonnet`) and is used for grouping, not pricing
 - first-turn cache write per run (the fixed cost of a fresh context), reported
   as "spin-up cost"
 - `mechanical_on_premium`: runs on the top two tiers whose tool calls were all
@@ -160,11 +173,17 @@ Surfaces:
   model, spin-up cost, mechanical-on-premium candidates)
 - `/moltbloat:audit`: new finding `unpinned_agent` (agent has no `model:` and
   has real spend), ranked by spend; LOW if no spend
+- `/moltbloat:audit`: new finding `delegation_prose_conflict`: instruction
+  prose naming a model tier for an agent type that contradicts that agent's
+  `model:` frontmatter (MEDIUM). Lives here, not in the lint, because it needs
+  the agent inventory
 
 ### 6. Skills wiring
 
 - `audit`: new Check 15 "Instruction quality" (components 2 and 3), plus
-  `unpinned_agent` and `skill_listing_at_cap` findings. Check 7 suggests adding
+  `unpinned_agent`, `delegation_prose_conflict`, and
+  `skill_description_dropped` (MEDIUM; fix: disable unused skill-heavy
+  plugins, informed by `/moltbloat:usage`) findings. Check 7 suggests adding
   `paths:` frontmatter to unused-language rules as the first fix, before
   removal.
 - `token-budget`: replaces estimated CLAUDE.md, rules, and MCP rows with
@@ -176,7 +195,8 @@ Surfaces:
   agent model" (shows the one-line frontmatter change, confirm per agent;
   suggested tier from observed runs, user picks). Back up each file to
   `~/.moltbloat/backups/<timestamp>/` before writing.
-- `help`, `README.md`, `CLAUDE.md`: document the new checks.
+- `help`, `README.md`, `CLAUDE.md`: document the new checks, and add
+  `~/.moltbloat/backups/` to the CLAUDE.md "Data Files" list.
 
 ## Config additions (`init-config.py` defaults)
 
@@ -202,7 +222,8 @@ Per script, a `scripts/test-<name>.py` with fixture files built in temp dirs
 (existing pattern). Cases:
 
 - ledger: each attachment type, missing types, unrecognized format exit,
-  hook attribution matched and unmatched
+  hook attribution matched and unmatched, bare-name skill entries detected
+  only when SKILL.md has a description
 - instruction-files: `@import` chains (4-hop limit, cycles, imports inside code
   fences ignored), `paths:` parsing, AGENTS.md detection
 - lint: emphasis counting excludes code and quotes; duplicate vs drifted
@@ -216,7 +237,8 @@ Per script, a `scripts/test-<name>.py` with fixture files built in temp dirs
 1. Context ledger + token-budget wiring (components 1, 6 token-budget part)
 2. Instruction files + lint + audit Check 15 + deprecation refresh
    (components 2, 3, 4)
-3. Delegation cost + unpinned_agent (component 5)
+3. Delegation cost + `unpinned_agent` + `delegation_prose_conflict`
+   (component 5)
 4. Clean actions for rewrites and agent pins (component 6 clean part)
 
 Slice order is by value: 1 exposes the biggest measured cost; 4 depends on 2
@@ -251,7 +273,12 @@ and 3.
 
 - Only the current project's instruction files are linted; other projects'
   AGENTS.md files need a per-project run (or `team-report`).
-- The skill listing cap is inferred, not documented.
+- The skill listing budget is undocumented; detection relies on the observed
+  bare-name format, which could change.
+- Linting only sees text; it cannot tell whether an emphasized rule is
+  actually over-triggering. Pairing lint findings with usage data (e.g. a
+  shouted "always use skill X" plus X's invocation rate) is a possible later
+  signal, not in this spec.
 - `mechanical_on_premium` is a heuristic; wording must present candidates, not
   conclusions.
 
