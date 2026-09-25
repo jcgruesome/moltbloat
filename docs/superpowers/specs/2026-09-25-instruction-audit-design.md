@@ -1,0 +1,266 @@
+# Instruction audit, measured context ledger, and delegation cost
+
+Date: 2026-09-25
+Status: draft, awaiting review
+Lane: `feat/instruction-audit`
+
+## Goal
+
+Make moltbloat catch the waste that newer models (Opus 5.5 and later) expose:
+instructions written for older models, duplicated or drifted instruction files,
+context injected by plugins that no check measures today, and subagent
+delegation that costs more than it saves. Findings stay report-only in
+`/moltbloat:audit`, `/moltbloat:token-budget`, and `/moltbloat:usage`. Rewrites
+are proposed as diffs and applied only by `/moltbloat:clean` after per-change
+confirmation.
+
+## Grounding (sources)
+
+- Newer models are more responsive to system prompts; emphatic wording written
+  for older models ("CRITICAL: You MUST") now over-triggers. Use normal
+  phrasing. <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices.md>
+- Opus 5.5 defaults to `medium` effort. <https://platform.claude.com/docs/en/about-claude/models/choosing-a-model.md>
+- Opus 5 guidance warns against overusing subagent delegation.
+  <https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5.md>
+- CLAUDE.md: target under 200 lines; `@imports` up to 4 hops; `.claude/rules/`
+  with `paths:` frontmatter loads conditionally; nested CLAUDE.md loads lazily;
+  `AGENTS.md` is read natively. <https://code.claude.com/docs/en/memory.md>
+- `TaskOutput` tool removed (Claude Code 2.1.274 to 2.1.282, Sep 2026).
+  <https://code.claude.com/docs/en/changelog.md>
+
+## Success criteria
+
+1. On the author's machine, audit reports: the duplicated and drifted
+   "Session wrap" sections and the `imported-from:` residue in
+   `~/.claude/CLAUDE.md`; the SessionStart hook context per plugin; the skill
+   listing sitting at its size cap; `executor`, `code-reviewer`, `verifier`
+   having no `model:` pin.
+2. `token-budget` reports measured per-session context by source, taken from
+   transcripts, with estimates used only where no transcript data exists and
+   labeled as such.
+3. `clean` offers a unified diff for each instruction rewrite and a one-line
+   frontmatter pin for each unpinned agent; nothing is written without a yes.
+4. No hardcoded plugin, skill, server, or agent names in any check.
+5. Every new script has a `test-*.py` suite and passes `scripts/validate.sh`.
+
+## Components
+
+Each unit is one script with one job, a `--json` mode, and a test file,
+matching the existing `scripts/` pattern.
+
+### 1. `scripts/context-ledger.py` (new): measured per-session context
+
+Reads the N most recent main-session transcripts (default 10, excludes
+`subagents/`) and extracts these attachment records, which Claude Code already
+writes:
+
+| Attachment `type` | Field used | Ledger row |
+|---|---|---|
+| `instructions` | `files[].path`, `.type`, `.content` length | one row per loaded instruction file |
+| `skill_listing` | `content` length, `skillCount` | Skill listing |
+| `deferred_tools_delta` | `addedNames` grouped by MCP server prefix | Deferred tool names, per server |
+| `mcp_instructions_delta` | `addedBlocks` length per `addedNames` entry | MCP server instructions, per server |
+| `agent_listing_delta` | `addedLines` length | Agent listing |
+| `hook_success` with `hookEvent: SessionStart` | `stdout` `additionalContext` length, `command` | Hook context, per hook command |
+| `hook_additional_context` | `content` length | Hook context (merged total) |
+
+Output: per source, median chars and tokens per session (using
+`estimates.tokens_per_byte`), plus the file paths that were actually loaded.
+
+Hook attribution: resolve each `command` string against the `hooks/hooks.json`
+of every installed plugin (structural match on the command text with
+`${CLAUDE_PLUGIN_ROOT}` expanded). Unmatched commands are reported as
+"unattributed hook", not guessed.
+
+Listing cap detection: if the skill listing length is within 1% of the maximum
+observed across sessions and identical across sessions, flag
+`skill_listing_at_cap` (the exact cap is not documented, so this is inferred
+from the data and worded that way).
+
+These attachment shapes are undocumented internals. If none of the recent
+transcripts contain any known attachment type, the script exits non-zero with
+"transcript format not recognized; context ledger unavailable" rather than
+falling back silently. Missing individual types are reported as "not present in
+transcripts", never zero.
+
+### 2. `scripts/instruction-files.py` (new): collect what loads and how
+
+Enumerates instruction files for the current project and labels each with a
+load mode:
+
+- always: `~/.claude/CLAUDE.md`, project `CLAUDE.md` / `.claude/CLAUDE.md`,
+  `CLAUDE.local.md`, `AGENTS.md`, ancestor-directory CLAUDE.md files, rules
+  without `paths:`
+- path-scoped: rules with `paths:` frontmatter
+- lazy: nested CLAUDE.md below the project root
+- imported: targets of `@path` references, resolved up to 4 hops, skipping code
+  spans and fenced blocks, with the importing file recorded
+
+Cross-checks against the ledger's `instructions` records when available, so
+the report can say "declared vs actually loaded" (for example, AGENTS.md
+present but never seen loaded).
+
+Consumers: `instruction-lint.py`, `claude-md-staleness.py` (Check 14 input list
+replaces its ad-hoc collection), and `token-budget` step 2a/2b.
+
+### 3. `scripts/instruction-lint.py` (new): quality checks and rewrite diffs
+
+Input: the file list from component 2, plus hook `additionalContext` text from
+component 1 (linted but never rewritten, since it belongs to a plugin).
+
+Checks (all structural):
+
+| id | Detects | Severity |
+|---|---|---|
+| `emphasis_density` | all-caps imperatives (`MUST`, `NEVER`, `ALWAYS`, `IMPORTANT`, `CRITICAL`, `REQUIRED`, `ABSOLUTELY`), XML-style shout tags (`<EXTREMELY_IMPORTANT>`), per 100 prose lines, excluding code fences and blockquotes | LOW above threshold, MEDIUM above 2x |
+| `duplicate_section` | two sections (split on headers, normalized) with body similarity >= 0.95, within or across files | MEDIUM |
+| `drifted_duplicate` | same normalized heading or body similarity 0.6 to 0.95; shows the differing lines | HIGH (two versions of one instruction is a conflict) |
+| `import_residue` | `<!-- imported-from: ... -->` markers left by `claude import` | LOW |
+| `delegation_prose_conflict` | prose naming a model tier for an agent type that contradicts that agent's `model:` frontmatter (uses component 5's agent inventory) | MEDIUM |
+
+The caps word list is a list of English emphasis words, not of plugin names, so
+it does not break the "no curated opinion lists" principle.
+
+`--suggest-rewrite <file>` emits a unified diff that:
+
+- removes exact duplicate sections (keeps the first occurrence)
+- removes `imported-from` marker comments
+- lowercases emphasis words to normal phrasing and drops shout tags, keeping
+  the sentence otherwise intact
+
+Drifted duplicates are never auto-merged. The diff leaves both, and `clean`
+asks which version to keep (or to keep both).
+
+### 4. `claude-md-staleness.py`: refresh deprecations
+
+Add `TaskOutput` to `KNOWN_DEPRECATIONS`, bump `SNAPSHOT_DATE`. Switch its file
+collection to component 2.
+
+### 5. Delegation cost: extend `scripts/parse-history.py`
+
+Subagent runs live in `<session>/subagents/agent-<id>.jsonl` with a sibling
+`agent-<id>.meta.json` holding `agentType`, `model`, `description`,
+`spawnDepth`. Add a `delegation` block to the aggregate:
+
+- per `agentType` x `model`: run count, input/output/cache-write/cache-read
+  tokens (from `message.usage`), dollar cost via `costs.*` and the cache
+  multipliers already in config
+- first-turn cache write per run (the fixed cost of a fresh context), reported
+  as "spin-up cost"
+- `mechanical_on_premium`: runs on the top two tiers whose tool calls were all
+  read-only (Read/Grep/Glob/read-only Bash) and whose final output was short;
+  reported as candidates, not verdicts
+
+Agent inventory: every agent definition in `~/.claude/agents/`, project
+`.claude/agents/`, and enabled plugins, with its `model:` value or "inherits".
+
+Surfaces:
+
+- `/moltbloat:usage`: new "Delegation cost" section (spend by agent type and
+  model, spin-up cost, mechanical-on-premium candidates)
+- `/moltbloat:audit`: new finding `unpinned_agent` (agent has no `model:` and
+  has real spend), ranked by spend; LOW if no spend
+
+### 6. Skills wiring
+
+- `audit`: new Check 15 "Instruction quality" (components 2 and 3), plus
+  `unpinned_agent` and `skill_listing_at_cap` findings. Check 7 suggests adding
+  `paths:` frontmatter to unused-language rules as the first fix, before
+  removal.
+- `token-budget`: replaces estimated CLAUDE.md, rules, and MCP rows with
+  ledger-measured rows when available; adds Skill listing, Deferred tool names,
+  MCP instructions, Agent listing, and Hook context rows. Estimates remain for
+  sources with no transcript data and are labeled "est.".
+- `clean`: new action types "Instruction rewrite" (shows diff, confirm per
+  file; drifted duplicates prompt for keep A / keep B / keep both) and "Pin
+  agent model" (shows the one-line frontmatter change, confirm per agent;
+  suggested tier from observed runs, user picks). Back up each file to
+  `~/.moltbloat/backups/<timestamp>/` before writing.
+- `help`, `README.md`, `CLAUDE.md`: document the new checks.
+
+## Config additions (`init-config.py` defaults)
+
+```
+thresholds.instruction_emphasis_per_100_lines: 3
+thresholds.duplicate_section_similarity: 0.95
+thresholds.drifted_section_similarity: 0.6
+thresholds.context_ledger_sessions: 10
+```
+
+## Error handling
+
+- Missing input paths: fail fast, non-zero exit (existing convention).
+- Unrecognized transcript format: fail fast with a clear message (component 1).
+- Malformed `meta.json` or frontmatter: report the file as unparseable in the
+  output; do not skip it silently.
+- `clean` write failures: stop the run at the failing file; backups already
+  taken remain.
+
+## Testing
+
+Per script, a `scripts/test-<name>.py` with fixture files built in temp dirs
+(existing pattern). Cases:
+
+- ledger: each attachment type, missing types, unrecognized format exit,
+  hook attribution matched and unmatched
+- instruction-files: `@import` chains (4-hop limit, cycles, imports inside code
+  fences ignored), `paths:` parsing, AGENTS.md detection
+- lint: emphasis counting excludes code and quotes; duplicate vs drifted
+  thresholds; rewrite diff applies cleanly with `patch` and is idempotent
+- parse-history delegation: meta join, cost math against config, mechanical
+  classification
+- `validate.sh` passes.
+
+## Delivery slices (one lane and PR each)
+
+1. Context ledger + token-budget wiring (components 1, 6 token-budget part)
+2. Instruction files + lint + audit Check 15 + deprecation refresh
+   (components 2, 3, 4)
+3. Delegation cost + unpinned_agent (component 5)
+4. Clean actions for rewrites and agent pins (component 6 clean part)
+
+Slice order is by value: 1 exposes the biggest measured cost; 4 depends on 2
+and 3.
+
+## Out of scope
+
+- Writing delegation policy into user files (the tool measures and points at
+  frontmatter; it does not prescribe a routing rule).
+- Rewriting plugin-owned content (hook output, plugin SKILL.md): reported with
+  the owning plugin so the user can disable or raise upstream.
+- Effort-level checks: config key names for effort pins are not yet confirmed
+  in docs; revisit when they are.
+
+## Self-review
+
+**Risks**
+
+- Transcript attachment formats are internal and can change in any release.
+  Mitigated by fail-fast detection and fixture tests; still, a format change
+  breaks slice 1 until updated.
+- Emphasis lint can flag intentional emphasis (safety rules). It is LOW/MEDIUM
+  and rewrites need confirmation, but noisy findings erode trust; the threshold
+  is configurable.
+- Section similarity can pair unrelated short sections. Require a minimum body
+  length (5 lines) before comparing.
+- Hook attribution by command text can fail for hooks defined in
+  `settings.json` rather than plugins; those appear as "unattributed" with the
+  source settings file if found.
+
+**Gaps**
+
+- Only the current project's instruction files are linted; other projects'
+  AGENTS.md files need a per-project run (or `team-report`).
+- The skill listing cap is inferred, not documented.
+- `mechanical_on_premium` is a heuristic; wording must present candidates, not
+  conclusions.
+
+**Elevation**
+
+- Measured context replaces estimates, which no comparable auditor does; the
+  existing `tokens_per_mcp_tool: 350` estimate overstates deferred MCP tools,
+  and the ledger corrects it.
+- "Declared vs actually loaded" instruction files catches silent misconfig
+  (an import that never resolves, an AGENTS.md that never loads).
+- Spin-up cost per subagent makes the delegation trade-off concrete in dollars
+  rather than argued in prose.
