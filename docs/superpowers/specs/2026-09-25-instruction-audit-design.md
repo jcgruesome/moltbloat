@@ -50,9 +50,14 @@ matching the existing `scripts/` pattern.
 
 ### 1. `scripts/context-ledger.py` (new): measured per-session context
 
-Reads the N most recent main-session transcripts (default 10, excludes
-`subagents/`) and extracts these attachment records, which Claude Code already
-writes:
+Scans main-session transcripts newest first (excludes `subagents/`) and
+extracts these attachment records, which Claude Code already writes. Not every
+session records every type (observed: in the 10 newest sessions, `instructions`
+and `hook_additional_context` appeared in 4, `skill_listing` in 10). So
+sampling is per type: keep scanning until each type has
+`context_ledger_samples` sessions (default 10) or `context_ledger_max_sessions`
+(default 100) have been scanned, whichever comes first. Each row reports its
+own sample count.
 
 | Attachment `type` | Field used | Ledger row |
 |---|---|---|
@@ -61,11 +66,22 @@ writes:
 | `deferred_tools_delta` | `addedNames` grouped by MCP server prefix | Deferred tool names, per server |
 | `mcp_instructions_delta` | `addedBlocks` length per `addedNames` entry | MCP server instructions, per server |
 | `agent_listing_delta` | `addedLines` length | Agent listing |
-| `hook_success` with `hookEvent: SessionStart` | `stdout` `additionalContext` length, `command` | Hook context, per hook command |
-| `hook_additional_context` | `content` length | Hook context (merged total) |
+| `hook_success` with `hookEvent: SessionStart` | `stdout` parsed as JSON, then `hookSpecificOutput.additionalContext` length; `command` | Hook context, per hook command |
+| `hook_additional_context` | `content` length | Hook context total |
+
+Hook totals are never summed across both types. `hook_additional_context` is
+the merged payload the model received, so it is the session total when
+present; the per-command `hook_success` rows only break that total down by
+source. Without it, the total is the sum of the per-command rows. A
+`hook_success` whose `stdout` is not JSON, or has no
+`hookSpecificOutput.additionalContext`, contributes 0 context (plain stdout
+from SessionStart is not injected as additionalContext) and is counted in an
+"unparsed hook output" tally so the assumption stays visible.
 
 Output: per source, median chars and tokens per session (using
 `estimates.tokens_per_byte`), plus the file paths that were actually loaded.
+The median is over sessions where that type was present; sessions without it
+are excluded, not counted as 0.
 
 Hook attribution: transcripts record `command` unexpanded (literal
 `${CLAUDE_PLUGIN_ROOT}/...`), so match it verbatim against the command strings
@@ -107,8 +123,10 @@ Cross-checks against the ledger's `instructions` records when available, so
 the report can say "declared vs actually loaded" (for example, AGENTS.md
 present but never seen loaded).
 
-Consumers: `instruction-lint.py`, `claude-md-staleness.py` (Check 14 input list
-replaces its ad-hoc collection), and `token-budget` step 2a/2b.
+Consumers: `instruction-lint.py`, `claude-md-staleness.py` (Check 14 takes
+these files in addition to the SKILL.md paths it already collects), and
+`token-budget` step 2a/2b. SKILL.md files are not instruction files and are
+not listed here.
 
 ### 3. `scripts/instruction-lint.py` (new): quality checks and rewrite diffs
 
@@ -125,7 +143,11 @@ Checks (all structural):
 | `import_residue` | `<!-- imported-from: ... -->` markers left by `claude import` | LOW |
 
 Sections under 5 body lines are not compared, to avoid pairing short
-unrelated sections.
+unrelated sections. Comparison is bounded: exact duplicates are found by
+hashing normalized bodies; fuzzy similarity runs only on pairs that share a
+normalized heading or at least 3 of their 10 most frequent content words.
+Scope is component 2's instruction files only (not SKILL.md), which keeps the
+input to tens of sections.
 
 The caps word list is a list of English emphasis words, not of plugin names, so
 it does not break the "no curated opinion lists" principle.
@@ -137,15 +159,19 @@ it does not break the "no curated opinion lists" principle.
 - softens emphasis: drops leading `IMPORTANT:` / `CRITICAL:` style prefixes
   and shout tags, and lowercases all-caps imperatives mid-sentence
   (`you MUST run` becomes `you must run`); sentence content is otherwise
-  untouched
+  untouched. Uses the same exclusions as `emphasis_density` (code fences,
+  blockquotes) plus inline code spans, so identifiers and quoted text are
+  never changed
 
 Drifted duplicates are never auto-merged. The diff leaves both, and `clean`
 asks which version to keep (or to keep both).
 
 ### 4. `claude-md-staleness.py`: refresh deprecations
 
-Add `TaskOutput` to `KNOWN_DEPRECATIONS`, bump `SNAPSHOT_DATE`. Switch its file
-collection to component 2.
+Add `TaskOutput` to `KNOWN_DEPRECATIONS`, bump `SNAPSHOT_DATE`. Add component
+2's instruction files to its input; keep its existing SKILL.md collection
+unchanged (dropping it would regress Check 14's deprecated and unknown skill
+reference findings on SKILL.md).
 
 ### 5. Delegation cost: extend `scripts/parse-history.py`
 
@@ -204,7 +230,8 @@ Surfaces:
 thresholds.instruction_emphasis_per_100_lines: 3
 thresholds.duplicate_section_similarity: 0.95
 thresholds.drifted_section_similarity: 0.6
-thresholds.context_ledger_sessions: 10
+thresholds.context_ledger_samples: 10
+thresholds.context_ledger_max_sessions: 100
 ```
 
 ## Error handling
@@ -213,6 +240,11 @@ thresholds.context_ledger_sessions: 10
 - Unrecognized transcript format: fail fast with a clear message (component 1).
 - Malformed `meta.json` or frontmatter: report the file as unparseable in the
   output; do not skip it silently.
+- Well-formed `meta.json` missing `model` (observed in about 19% of sampled
+  subagent runs): group the run under the model alias derived from its
+  messages' `message.model`; if the transcript has no model either, group it
+  as "model unknown" and exclude it from `mechanical_on_premium`. Costs still
+  use `message.model` when present.
 - `clean` write failures: stop the run at the failing file; backups already
   taken remain.
 
@@ -221,9 +253,14 @@ thresholds.context_ledger_sessions: 10
 Per script, a `scripts/test-<name>.py` with fixture files built in temp dirs
 (existing pattern). Cases:
 
-- ledger: each attachment type, missing types, unrecognized format exit,
+- ledger: each attachment type, missing types, per-type sampling stops at
+  the sample or session cap, median excludes absent sessions, hook totals not
+  double-counted when both hook types exist, non-JSON hook stdout,
+  unrecognized format exit,
   hook attribution matched and unmatched, bare-name skill entries detected
   only when SKILL.md has a description
+- staleness: SKILL.md findings unchanged after the input switch (regression
+  test on an existing fixture)
 - instruction-files: `@import` chains (4-hop limit, cycles, imports inside code
   fences ignored), `paths:` parsing, AGENTS.md detection
 - lint: emphasis counting excludes code and quotes; duplicate vs drifted
