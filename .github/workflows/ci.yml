@@ -57,8 +57,11 @@ jobs:
 
       - name: Check total size
         run: |
-          total_bytes=$(find . -type f -not -path './.git/*' -exec cat {} \; 2>/dev/null | wc -c)
-          echo "Total bytes: $total_bytes"
+          # Measures what the plugin ships: design docs and test scripts are
+          # never loaded into a user's context, so they are excluded.
+          total_bytes=$(find . -type f -not -path './.git/*' -not -path './docs/*' \
+            -not -path './scripts/test-*' -exec cat {} \; 2>/dev/null | wc -c)
+          echo "Total bytes (excluding docs/ and scripts/test-*): $total_bytes"
           # Soft limit at 260KB, hard limit at 320KB
           if [ "$total_bytes" -gt 320000 ]; then
             echo "ERROR: Plugin size exceeds 320KB. Consider reducing documentation or merging skills."
