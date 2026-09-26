@@ -134,7 +134,15 @@ def extract_session(path):
             if "addedLines" not in a:
                 s["format_errors"].append(f"deferred_tools_delta: missing addedLines in {path}")
                 continue
-            deferred.update(_aligned(a, "addedNames", "addedLines", kind, path, s["format_errors"]))
+            # Re-added names appear in addedNames but get no new line;
+            # addedLines covers only the fresh names (verified on real
+            # transcripts 2026-09-26). A tool's line is its name.
+            readded = set(a.get("readdedNames") or [])
+            fresh = [n for n in a.get("addedNames") or [] if n not in readded]
+            deferred.update(_aligned({"addedNames": fresh, "addedLines": a["addedLines"]},
+                                     "addedNames", "addedLines", kind, path, s["format_errors"]))
+            for name in readded:
+                deferred.setdefault(name, name)
         elif kind == "mcp_instructions_delta":
             mcp.update(_aligned(a, "addedNames", "addedBlocks", kind, path, s["format_errors"]))
         elif kind == "agent_listing_delta":
