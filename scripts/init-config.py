@@ -172,9 +172,35 @@ def init_config():
     return config
 
 
+def load_config():
+    """Read config without writing anything.
+
+    Missing file -> defaults. Old version -> migrated in memory only. Skills
+    call --get/--dump, and read-only skills must not rewrite the user's file;
+    only --init (init_config) creates or migrates it on disk.
+    """
+    if not os.path.exists(CONFIG_PATH):
+        return migrate_config({})
+    try:
+        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+            user_config = json.load(f)
+    except (json.JSONDecodeError, IOError) as e:
+        print(f"Error loading config: {e}, using defaults", file=sys.stderr)
+        return DEFAULT_CONFIG
+    if user_config.get("version", "1.0") != CONFIG_VERSION:
+        return migrate_config(user_config)
+    config = {k: (v.copy() if isinstance(v, dict) else v) for k, v in DEFAULT_CONFIG.items()}
+    for key, value in user_config.items():
+        if isinstance(value, dict) and key in config and isinstance(config[key], dict):
+            config[key] = {**config[key], **value}
+        else:
+            config[key] = value
+    return config
+
+
 def get_value(key_path, default=None):
     """Get a config value by dot-notation path (e.g., 'thresholds.token_warning')."""
-    config = init_config()
+    config = load_config()
     keys = key_path.split('.')
     
     try:
@@ -188,7 +214,7 @@ def get_value(key_path, default=None):
 
 def validate_config():
     """Validate config structure and print any issues."""
-    config = init_config()
+    config = load_config()
     errors = []
     
     # Check required sections
@@ -232,7 +258,7 @@ if __name__ == "__main__":
         else:
             print(value if value is not None else "")
     elif args.dump:
-        print(json.dumps(init_config(), indent=2))
+        print(json.dumps(load_config(), indent=2))
     else:
         # Default: ensure config exists and show path
         init_config()
