@@ -275,6 +275,10 @@ thresholds.context_ledger_samples: 10
 thresholds.context_ledger_max_sessions: 100
 ```
 
+`instruction_byte_budget` defaults to 25,000 bytes, the size Claude Code's
+memory docs give as the load limit for auto memory; it is a starting
+default, not a measured optimum.
+
 ## Error handling
 
 - Missing input paths: fail fast, non-zero exit (existing convention).
