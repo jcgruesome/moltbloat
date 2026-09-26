@@ -184,6 +184,14 @@ else
   ((ERRORS++))
 fi
 
+# check-snapshot-age: Stop-hook reminder prints at most once a day
+if python3 "$PLUGIN_ROOT/scripts/test-check-snapshot-age.py" >/dev/null 2>&1; then
+  echo "  ✓ test-check-snapshot-age.py: all assertions pass"
+else
+  echo "  ✗ test-check-snapshot-age.py: FAILED"
+  ((ERRORS++))
+fi
+
 # parse-history miner — deterministic fixture-based test
 if python3 "$PLUGIN_ROOT/scripts/test-parse-history.py" >/dev/null 2>&1; then
   echo "  ✓ test-parse-history.py: all assertions pass"
