@@ -447,20 +447,25 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    Run this before Check 14, which reuses its file list.
 
    **Find the instruction files** Claude Code loads for this project, and how
-   each loads (always, path-scoped, lazy, or imported via `@path`):
+   each loads (always, path-scoped, lazy, or imported via `@path`). Run this
+   as one Bash call so the temp file survives:
    ```bash
    project="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
    ledger_json="$(mktemp)"
-   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/context-ledger.py" --json --project "$project" > "$ledger_json"
-   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/instruction-files.py" --project "$project" \
-     --ledger-json "$ledger_json" --json
+   if python3 "${CLAUDE_PLUGIN_ROOT}/scripts/context-ledger.py" --json --project "$project" > "$ledger_json"; then
+     python3 "${CLAUDE_PLUGIN_ROOT}/scripts/instruction-files.py" --project "$project" --ledger-json "$ledger_json" --json
+   else
+     echo "LEDGER_UNAVAILABLE"
+     python3 "${CLAUDE_PLUGIN_ROOT}/scripts/instruction-files.py" --project "$project" --json
+   fi
+   rm -f "$ledger_json"
    ```
-   If `context-ledger.py` exits non-zero, run `instruction-files.py` without
-   `--ledger-json` and say the "seen loaded" column is unavailable (quote the
-   ledger's stderr).
+   If the output starts with `LEDGER_UNAVAILABLE`, say the "seen loaded"
+   column is unavailable and quote the ledger's stderr.
 
-   **Lint them**: pass every file whose `load_mode` is `always` or
-   `imported` (these load every session), with thresholds from config:
+   **Lint the files that load every session**: every file whose `load_mode`
+   is `always`, plus `imported` files whose `parent_load_mode` is `always`,
+   with thresholds from config:
    ```bash
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/instruction-lint.py" <paths> --json \
      --emphasis-per-100 "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get thresholds.instruction_emphasis_per_100_lines)" \
@@ -472,24 +477,30 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    Findings (severity comes from the script):
    - `drifted_duplicate` (HIGH): two diverged versions of one section; show
      the `differences` lines so the user can pick one. Never merge them.
-   - `duplicate_section` (MEDIUM): an exact or near-exact copy.
+   - `duplicate_section` (MEDIUM): an exact or near-exact copy, within or
+     across files.
    - `emphasis_density` (LOW/MEDIUM): emphatic wording written for older
-     models, which newer models tend to over-apply.
+     models, which newer models tend to over-apply. Report-only: rewording
+     needs the user's judgment.
    - `instruction_byte_budget` (LOW/MEDIUM), `placeholder_marker` (LOW),
      `import_residue` (LOW).
    - From `instruction-files.py`: each `unresolved_imports` entry (MEDIUM:
-     an `@path` that loads nothing), and each always-loaded file with
-     `observed: false` (LOW: present but never seen loaded in the ledger's
-     sampled sessions for this project; say how many were sampled).
+     an `@path` that loads nothing; relative imports resolve from the
+     importing file's directory), each `warnings` entry (LOW), and each
+     always-loaded file with `observed: false` (LOW: present but never seen
+     loaded in the ledger's sampled sessions for this project; say how many
+     were sampled).
 
-   **Suggested rewrite**: for each file with a duplicate, marker, or emphasis
-   finding, show the diff from
-   `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/instruction-lint.py" --suggest-rewrite <file>`
-   (add `--also <other file>` for each other always-loaded file, so a
-   section duplicated across files is removed from the later one). Exit 3
-   means the rewrite would have changed code, a URL, or an `@import`, so no
-   rewrite is suggested; say so. This check is report-only: applying a
-   rewrite is `/moltbloat:clean`'s job, with confirmation.
+   **Suggested rewrite**: for each file with an `import_residue` or
+   within-file `duplicate_section` finding, show the diff from
+   `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/instruction-lint.py" --suggest-rewrite <file>`.
+   It only removes `claude import` markers and sections that exactly repeat
+   an earlier section of the same file (same heading path, identical
+   subtree). Exit 3 means it refused (non-Markdown, CRLF, or it would have
+   lost code, a URL, an `@import`, or a file path); say so. Cross-file
+   duplicates, drifted pairs, and emphasis stay report-only. This check never
+   edits files; applying a rewrite is `/moltbloat:clean`'s job, with
+   confirmation.
 
 4. **Classify findings**
 

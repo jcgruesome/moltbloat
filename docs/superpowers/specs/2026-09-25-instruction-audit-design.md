@@ -164,14 +164,17 @@ it does not break the "no curated opinion lists" principle.
 
 `--suggest-rewrite <file>` emits a unified diff that:
 
-- removes exact duplicate sections (keeps the first occurrence)
 - removes `imported-from` marker comments
-- softens emphasis: drops leading `IMPORTANT:` / `CRITICAL:` style prefixes
-  and shout tags, and lowercases all-caps imperatives mid-sentence
-  (`you MUST run` becomes `you must run`); sentence content is otherwise
-  untouched. Uses the same exclusions as `emphasis_density` (code fences,
-  blockquotes) plus inline code spans, so identifiers and quoted text are
-  never changed
+- removes a section only when an earlier section of the same file has the
+  same heading path (parent headings included) and an identical subtree
+  (body plus every child section)
+
+Revised 2026-09-26 after review: emphasis softening and cross-file removal
+were dropped from the rewrite. Softening by pattern deleted placeholders
+like `<YOUR_API_TOKEN>`, broke `**IMPORTANT:**` bold markup, and changed
+file paths; cross-file removal deleted a shared section from both files
+when each was rewritten against the other. Both stay as findings for the
+user to act on. File paths joined the preserve list.
 
 Drifted duplicates are never auto-merged. The diff leaves both, and `clean`
 asks which version to keep (or to keep both).

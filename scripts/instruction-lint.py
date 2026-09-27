@@ -11,16 +11,19 @@ Checks, all structural:
 
 Code fences, inline code, and blockquotes are never counted or rewritten.
 
---suggest-rewrite FILE prints a unified diff that removes exact duplicate
-sections and import markers and softens emphasis. It refuses (exit 3) if the
-rewrite would drop any preserved item: fenced block, inline code span, URL,
-or @import line.
+--suggest-rewrite FILE prints a unified diff that removes `claude import`
+markers and sections that exactly repeat an earlier section of the same file
+(same heading path, identical subtree). Emphasis and cross-file duplicates
+are reported, never rewritten. It refuses (exit 3) for non-Markdown or CRLF
+files, or if the rewrite would lose every copy of a fenced block, inline
+code span, URL, @import, or file path. Setext (underlined) headings are not
+treated as section breaks.
 
 Usage:
   python3 instruction-lint.py FILE [FILE ...] [--json]
       [--emphasis-per-100 N] [--duplicate-similarity F]
       [--drifted-similarity F] [--byte-budget N]
-  python3 instruction-lint.py --suggest-rewrite FILE [--also FILE ...]
+  python3 instruction-lint.py --suggest-rewrite FILE
 """
 import difflib
 import hashlib
@@ -33,7 +36,6 @@ from collections import Counter
 EMPHASIS_WORDS = ("MUST", "NEVER", "ALWAYS", "IMPORTANT", "CRITICAL", "REQUIRED", "ABSOLUTELY")
 EMPHASIS_RE = re.compile(r"\b(" + "|".join(EMPHASIS_WORDS) + r")\b")
 SHOUT_TAG_RE = re.compile(r"</?[A-Z][A-Z_]{3,}>")
-LEADING_EMPHASIS_RE = re.compile(r"(^|(?<=[\s*>(-]))(?:\*\*)?(IMPORTANT|CRITICAL)(?:\*\*)?:\s*")
 PLACEHOLDER_RE = re.compile(r"\b(TODO|FIXME|TBD|XXX)\b|not implemented", re.IGNORECASE)
 PLACEHOLDER_CASE_SENSITIVE = {"TODO", "FIXME", "TBD", "XXX"}
 IMPORT_MARKER_RE = re.compile(r"^\s*<!--\s*imported-from:.*?-->\s*$")
@@ -46,6 +48,12 @@ WORD_RE = re.compile(r"[a-z]{4,}")
 
 MIN_SECTION_LINES = 5
 MIN_SAME_HEADING_LINES = 2
+# Above this many candidate sections, fuzzy comparison runs only on pairs
+# with the same heading, keeping huge files from pairwise blowup.
+FUZZY_PAIR_CAP = 300
+STOPWORDS = {"this", "that", "with", "from", "have", "your", "when", "then", "they", "them",
+             "will", "each", "into", "only", "also", "than", "what", "which", "there", "their",
+             "should", "would", "could", "about", "before", "after", "using", "must", "never"}
 SHARED_TOP_WORDS = 3
 DEFAULTS = {"emphasis_per_100": 3.0, "duplicate_similarity": 0.95,
             "drifted_similarity": 0.6, "byte_budget": 25000}
@@ -58,12 +66,13 @@ def _read(path):
 
 def prose_mask(lines):
     """Per line: True if it is prose (not inside a fence, not a fence line, not a blockquote)."""
-    mask, in_fence = [], False
+    mask, fence = [], None
     for line in lines:
-        if FENCE_RE.match(line):
-            in_fence = not in_fence
+        m = FENCE_RE.match(line)
+        if m and (fence is None or m.group(1) == fence):
+            fence = None if fence else m.group(1)
             mask.append(False)
-        elif in_fence or line.lstrip().startswith(">"):
+        elif fence or line.lstrip().startswith(">"):
             mask.append(False)
         else:
             mask.append(True)
@@ -132,7 +141,8 @@ def _norm_body(lines):
 
 
 def _top_words(body):
-    return {w for w, _ in Counter(WORD_RE.findall(body)).most_common(10)}
+    words = [w for w in WORD_RE.findall(body) if w not in STOPWORDS]
+    return {w for w, _ in Counter(words).most_common(10)}
 
 
 def compare_sections(sections, dup_sim, drift_sim):
@@ -146,6 +156,7 @@ def compare_sections(sections, dup_sim, drift_sim):
         cands.append((s, body, _norm_heading(s["heading"]), _top_words(body),
                       hashlib.sha1(body.encode()).hexdigest(), n_lines))
     findings = []
+    fuzzy_by_words = len(cands) <= FUZZY_PAIR_CAP
     for i in range(len(cands)):
         for j in range(i + 1, len(cands)):
             a, ab, ah, aw, ahash, an = cands[i]
@@ -157,7 +168,7 @@ def compare_sections(sections, dup_sim, drift_sim):
                 continue
             if ahash == bhash:
                 ratio = 1.0
-            elif same_heading or len(aw & bw) >= SHARED_TOP_WORDS:
+            elif same_heading or (fuzzy_by_words and len(aw & bw) >= SHARED_TOP_WORDS):
                 ratio = difflib.SequenceMatcher(None, ab, bb).ratio()
             else:
                 continue
@@ -216,96 +227,121 @@ def lint_files(paths, emphasis_per_100=DEFAULTS["emphasis_per_100"],
 
 
 # ---------- rewrite ----------
+#
+# The rewrite is deliberately structural only: it removes `claude import`
+# marker lines and exact duplicate sections within one file. Emphasis and
+# cross-file duplicates are reported, never rewritten: softening wording and
+# choosing which file keeps a shared section both need a human.
+
+PATH_RE = re.compile(r"(?<![\w@/])(?:~/|\.{1,2}/|/)?(?:[\w.\-]+/)+[\w.\-]+|(?<![\w@/])[\w\-]+\.(?:md|json|ya?ml|toml|py|js|ts|sh)\b")
+
 
 def preserved_items(text):
-    """Set of items a rewrite must keep: fenced blocks, inline code, URLs, @imports."""
-    items, block, in_fence = set(), [], False
+    """Items a rewrite must keep at least one copy of: fenced blocks, inline
+    code, URLs, @imports, and file paths."""
+    items, block, fence = set(), [], None
     for line in text.splitlines():
-        if FENCE_RE.match(line):
-            if in_fence:
+        m = FENCE_RE.match(line)
+        if m and (fence is None or m.group(1) == fence):
+            if fence is not None:
                 items.add("fence:" + "\n".join(block))
                 block = []
-            in_fence = not in_fence
+                fence = None
+            else:
+                fence = m.group(1)
             continue
-        if in_fence:
+        if fence is not None:
             block.append(line)
             continue
-        items.update("code:" + m for m in INLINE_CODE_RE.findall(line))
-        items.update("url:" + m for m in URL_RE.findall(line))
-        items.update("import:" + m for m in IMPORT_LINE_RE.findall(_prose_text(line)))
+        items.update("code:" + c for c in INLINE_CODE_RE.findall(line))
+        items.update("url:" + u for u in URL_RE.findall(line))
+        prose = URL_RE.sub("", _prose_text(line))
+        items.update("import:" + i for i in IMPORT_LINE_RE.findall(prose))
+        items.update("path:" + q for q in PATH_RE.findall(prose))
     return items
 
 
-def _soften_line(line):
-    # Inline code and URLs are split out and never changed.
-    parts = re.split(r"(`[^`\n]*`|https?://[^\s)>\]]+)", line)
-    for k in range(0, len(parts), 2):
-        seg = LEADING_EMPHASIS_RE.sub(lambda m: m.group(1), parts[k])
-        seg = SHOUT_TAG_RE.sub("", seg)
-        seg = EMPHASIS_RE.sub(lambda m: m.group(1).lower(), seg)
-        parts[k] = seg
-    return "".join(parts)
+def _subtrees(lines, mask):
+    """(start, end, path) per header; a subtree runs to the next header of the
+    same or higher level. `path` is the normalized headings from the root."""
+    heads = []
+    for n, (line, is_prose) in enumerate(zip(lines, mask)):
+        m = HEADER_RE.match(line) if is_prose else None
+        if m:
+            heads.append((n, len(m.group(1)), _norm_heading(m.group(2))))
+    out, stack = [], []
+    for k, (n, level, heading) in enumerate(heads):
+        while stack and stack[-1][0] >= level:
+            stack.pop()
+        stack.append((level, heading))
+        end = len(lines)
+        for n2, level2, _ in heads[k + 1:]:
+            if level2 <= level:
+                end = n2
+                break
+        out.append((n, end, tuple(h for _, h in stack)))
+    return out
 
 
-def rewrite(text, other_texts=()):
-    """Rewritten text: drop exact-duplicate sections, import markers, emphasis."""
+def rewrite(text):
+    """Text with import markers and exact duplicate sections removed.
+
+    A section is removed only when an earlier section has the same heading
+    path (parent headings included, levels ignored) and an identical subtree
+    (its body plus every child section), with at least MIN_SAME_HEADING_LINES
+    non-blank body lines. Everything else is left byte-for-byte.
+    """
     lines = text.splitlines()
     mask = prose_mask(lines)
+    drop = set(n for n, (line, p) in enumerate(zip(lines, mask)) if p and IMPORT_MARKER_RE.match(line))
     seen = set()
-    for other in other_texts:
-        for s in split_sections("", other):
-            body = _norm_body(s["body_lines"])
-            if sum(1 for l in s["body_lines"] if l.strip()) >= MIN_SAME_HEADING_LINES:
-                seen.add((_norm_heading(s["heading"]), body))
-    out = []
-    for line, is_prose in zip(lines, mask):
-        m = HEADER_RE.match(line) if is_prose else None
-        if is_prose and IMPORT_MARKER_RE.match(line):
+    for start, end, path in _subtrees(lines, mask):
+        if start in drop:
+            continue  # inside a subtree already removed
+        body = [l for k, l in enumerate(lines[start + 1:end], start + 1) if k not in drop]
+        key = (path, _norm_body(body))
+        if sum(1 for l in body if l.strip()) < MIN_SAME_HEADING_LINES:
             continue
-        out.append((line, is_prose, m))
-    # Second pass: drop a section whose heading and body exactly match an
-    # earlier one (in this file or an --also file). Only exact matches;
-    # drifted versions are left for the user to choose between.
-    result, current = [], []
-
-    def flush():
-        if not current:
-            return
-        header = current[0][2]
-        body_lines = [l for l, _, _ in (current[1:] if header else current)]
-        key = (_norm_heading(header.group(2)) if header else "", _norm_body(body_lines))
-        substantive = sum(1 for l in body_lines if l.strip()) >= MIN_SAME_HEADING_LINES
-        if header and substantive and key in seen:
-            return
-        if substantive:
-            seen.add(key)
-        result.extend(current)
-
-    for item in out:
-        if item[2]:
-            flush()
-            current = [item]
+        if key in seen:
+            drop.update(range(start, end))
+            # also drop the blank line that separated it, so no gap doubles
+            if start > 0 and not lines[start - 1].strip() and (end >= len(lines) or not lines[end].strip()):
+                drop.add(start - 1)
         else:
-            current.append(item)
-    flush()
-    final = [_soften_line(l) if p else l for l, p, _ in result]
+            seen.add(key)
+    kept = [l for n, l in enumerate(lines) if n not in drop]
     trailing = "\n" if text.endswith("\n") else ""
-    return re.sub(r"\n{3,}", "\n\n", "\n".join(final)) + trailing
+    return "\n".join(kept) + trailing
 
 
-def suggest_rewrite(path, also=()):
-    """(exit_code, output). 0 with a diff, 0 with no-op note, 3 if unsafe."""
-    text = _read(path)
-    new = rewrite(text, [_read(p) for p in also])
+def _unified_diff(path, old, new):
+    """Unified diff that `patch` accepts, including files without a final newline."""
+    out = []
+    for line in difflib.unified_diff(old.splitlines(True), new.splitlines(True),
+                                     fromfile=path, tofile=path + " (suggested)"):
+        if line.endswith("\n"):
+            out.append(line)
+        else:
+            out.append(line + "\n\\ No newline at end of file\n")
+    return "".join(out)
+
+
+def suggest_rewrite(path):
+    """(exit_code, output). 0 with a diff or a no-op note, 3 if refused."""
+    if not path.endswith(".md"):
+        return 3, f"error: {path} is not a Markdown file; only prose instruction files are rewritten\n"
+    with open(path, "r", encoding="utf-8", errors="replace", newline="") as f:
+        text = f.read()  # newline="" keeps \r\n visible
+    if "\r" in text:
+        return 3, f"error: {path} uses CRLF line endings; no rewrite suggested\n"
+    new = rewrite(text)
     if new == text:
         return 0, f"No rewrite suggested for {path}."
     lost = preserved_items(text) - preserved_items(new)
     if lost:
         sample = ", ".join(sorted(lost)[:3])
         return 3, f"error: rewrite of {path} would drop preserved content ({sample}); not suggested\n"
-    diff = difflib.unified_diff(text.splitlines(True), new.splitlines(True),
-                                fromfile=path, tofile=path + " (suggested)")
-    return 0, "".join(diff)
+    return 0, _unified_diff(path, text, new)
 
 
 def render_markdown(result):
@@ -329,19 +365,14 @@ def main(argv):
         if len(args) < 2:
             sys.stderr.write("error: --suggest-rewrite requires a file\n")
             return 2
-        path, also, rest = args[1], [], args[2:]
-        while rest:
-            if rest[0] == "--also" and len(rest) > 1:
-                also.append(rest[1])
-                rest = rest[2:]
-            else:
-                sys.stderr.write(f"error: unknown argument {rest[0]}\n")
-                return 2
-        for p in [path] + also:
-            if not os.path.isfile(p):
-                sys.stderr.write(f"error: file not found: {p}\n")
-                return 1
-        code, out = suggest_rewrite(path, also)
+        if len(args) > 2:
+            sys.stderr.write(f"error: unknown argument {args[2]}\n")
+            return 2
+        path = args[1]
+        if not os.path.isfile(path):
+            sys.stderr.write(f"error: file not found: {path}\n")
+            return 1
+        code, out = suggest_rewrite(path)
         (sys.stderr if code else sys.stdout).write(out if out.endswith("\n") else out + "\n")
         return code
 

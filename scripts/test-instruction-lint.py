@@ -68,35 +68,63 @@ def run():
         short = write(d, "short.md", "## One\nalpha beta\ngamma delta\n## Two\nalpha beta\ngamma delta\n")
         _assert("duplicate_section" not in types(il.lint_files([short])), "short sections with different headings not paired")
 
-        print("Test: rewrite drops exact duplicates and markers, softens emphasis, keeps code")
-        doc = write(d, "doc.md", "<!-- imported-from: x -->\n# Top\n\nIMPORTANT: you MUST run `MUST_KEEP` via https://x.io/MUST.\n\n"
-                    "```\nNEVER touch\n```\n\n" + WRAP_A + "\n" + WRAP_A)
+        print("Test: rewrite removes markers and exact duplicate sections only")
+        doc = write(d, "doc.md", "<!-- imported-from: x -->\n# Top\n\nIMPORTANT: you MUST run `MUST_KEEP` via https://x.io/MUST.\n"
+                    "Set the header to <YOUR_API_TOKEN> first. See docs/IMPORTANT.md.\n\n"
+                    "```\nNEVER touch\n\n\nkeep blanks\n```\n\n" + WRAP_A + "\n" + WRAP_A)
         new = il.rewrite(il._read(doc))
         _assert("imported-from" not in new, "marker removed")
         _assert(new.count("## Wrap") == 1, "exact duplicate section removed, first kept")
-        _assert("you must run `MUST_KEEP`" in new and "IMPORTANT:" not in new, "emphasis softened, inline code kept")
-        _assert("https://x.io/MUST" in new and "NEVER touch" in new, "URL and fenced block untouched")
+        _assert("IMPORTANT: you MUST run `MUST_KEEP` via https://x.io/MUST." in new, "emphasis, code and URL untouched")
+        _assert("<YOUR_API_TOKEN>" in new and "docs/IMPORTANT.md" in new, "placeholders and paths untouched")
+        _assert("NEVER touch\n\n\nkeep blanks" in new, "blank lines inside a fence untouched")
         code, out = il.suggest_rewrite(doc)
         _assert(code == 0 and out.startswith("---"), "suggest_rewrite returns a unified diff")
         again = write(d, "again.md", new)
         _assert(il.suggest_rewrite(again) == (0, f"No rewrite suggested for {again}."), "rewrite is idempotent")
 
-        print("Test: --also removes a section duplicated in another file")
-        other = write(d, "other.md", WRAP_A)
-        _assert("## Wrap" not in il.rewrite(il._read(a), [il._read(other)]), "section already in --also file removed")
+        print("Test: rewrite respects the heading hierarchy")
+        mono = ("# Repo\n\n## web\n\n### Commands\n\n- pnpm dev\n- pnpm test\n\n"
+                "## api\n\n### Commands\n\n- pnpm dev\n- pnpm test\n")
+        _assert(il.rewrite(mono) == mono, "same subsection under different parents is kept")
+        reparent = ("## Setup\n\nInstall deps\nRun build\n\n### Web\n\nweb one\nweb two\n\n"
+                    "## Setup\n\nInstall deps\nRun build\n\n### API\n\napi one\napi two\n")
+        _assert(il.rewrite(reparent) == reparent, "duplicate parent with different children is kept")
+        whole = WRAP_A + "\n### Detail\n\nd one\nd two\n\n" + WRAP_A + "\n### Detail\n\nd one\nd two\n"
+        out_whole = il.rewrite(whole)
+        _assert(out_whole.count("## Wrap") == 1 and out_whole.count("### Detail") == 1,
+                "identical subtree removed with its children")
 
-        print("Test: unsafe rewrite refused")
+        print("Test: diff applies with patch, including files without a final newline")
+        import shutil
+        import subprocess
+        if shutil.which("patch"):
+            for name, tail in (("nl.md", "\n"), ("nonl.md", "")):
+                src = write(d, name, "<!-- imported-from: x -->\n# T\n\nbody one\nbody two" + tail)
+                code, diff = il.suggest_rewrite(src)
+                expected = il.rewrite(il._read(src))
+                res = subprocess.run(["patch", "-s", src], input=diff, text=True, capture_output=True)
+                _assert(res.returncode == 0 and il._read(src) == expected, f"patch applies the diff ({name})")
+        else:
+            print("  skip patch not installed")
+
+        print("Test: refusals")
+        crlf = write(d, "crlf.md", "<!-- imported-from: x -->\r\n# T\r\n")
+        _assert(il.suggest_rewrite(crlf)[0] == 3, "CRLF file refused")
+        txt = write(d, "rules.txt", "<!-- imported-from: x -->\n")
+        _assert(il.suggest_rewrite(txt)[0] == 3, "non-Markdown file refused")
         orig_rewrite = il.rewrite
-        il.rewrite = lambda text, other=(): text.replace("`MUST_KEEP`", "")
+        il.rewrite = lambda text: text.replace("`MUST_KEEP`", "").replace("docs/IMPORTANT.md", "")
         code, out = il.suggest_rewrite(doc)
         il.rewrite = orig_rewrite
-        _assert(code == 3 and "preserved content" in out, "dropping inline code is refused with exit 3")
+        _assert(code == 3 and "preserved content" in out, "losing inline code or a path is refused with exit 3")
 
         print("Test: main exit codes")
         _assert(il.main(["x"]) == 2, "no files -> 2")
         _assert(il.main(["x", os.path.join(d, "nope.md")]) == 1, "missing file -> 1")
         _assert(il.main(["x", a, "--byte-budget", "abc"]) == 2, "bad number -> 2")
         _assert(il.main(["x", "--suggest-rewrite", os.path.join(d, "nope.md")]) == 1, "rewrite missing file -> 1")
+        _assert(il.main(["x", "--suggest-rewrite", a, "--also", c]) == 2, "--also no longer accepted -> 2")
         _assert(il.main(["x", a, c, "--json"]) == 0, "json run ok")
     print("All instruction-lint tests passed.")
 

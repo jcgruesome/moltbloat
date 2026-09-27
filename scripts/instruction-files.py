@@ -13,7 +13,10 @@ Load modes:
   imported     targets of `@path` references, resolved up to 4 hops
 
 AGENTS.md is listed as `always` per the memory docs; the `observed` field
-from --ledger-json says whether transcripts ever showed it loading.
+from --ledger-json says whether transcripts ever showed it loading. Paths
+that resolve to the same file (e.g. AGENTS.md symlinked to CLAUDE.md) are
+listed once. Imports carry `parent_load_mode`: an import from a lazy file is
+lazy too.
 
 Usage:
   python3 instruction-files.py --project DIR [--home DIR] [--ledger-json FILE] [--json]
@@ -21,6 +24,7 @@ Usage:
 import json
 import os
 import re
+import subprocess
 import sys
 
 MAX_IMPORT_HOPS = 4
@@ -38,12 +42,12 @@ def _read(path):
 
 
 def rule_paths_frontmatter(text):
-    """True if the file's YAML frontmatter has a `paths:` key."""
+    """True / False for a `paths:` key in YAML frontmatter; None if unclosed."""
     if not text.startswith("---"):
         return False
     end = text.find("\n---", 3)
     if end == -1:
-        return False
+        return None
     return any(line.startswith("paths:") for line in text[3:end].splitlines())
 
 
@@ -58,7 +62,7 @@ def find_imports(text):
         if in_fence:
             continue
         for m in IMPORT_RE.finditer(INLINE_CODE_RE.sub("", line)):
-            out.append(m.group(1))
+            out.append(m.group(1).rstrip(".,;:)"))
     return out
 
 
@@ -67,18 +71,18 @@ def _looks_like_path(token):
 
 
 def resolve_imports(start_files, home):
-    """Follow @imports from start_files. Returns (imported, unresolved).
+    """Follow @imports from start_files, a list of (path, load_mode).
 
-    imported: list of {path, imported_from, hop}. unresolved: list of
-    {token, imported_from} for path-like tokens that do not exist. Tokens
-    that are neither existing files nor path-like (e.g. `@scope/pkg`) are
-    ignored.
+    Returns (imported, unresolved). imported: list of {path, imported_from,
+    hop, parent_load_mode}. unresolved: list of {token, imported_from} for
+    path-like tokens that do not exist. Tokens that are neither existing
+    files nor path-like (e.g. `@scope/pkg`) are ignored.
     """
-    seen = set(os.path.realpath(p) for p in start_files)
+    seen = set(os.path.realpath(p) for p, _ in start_files)
     imported, unresolved = [], []
-    frontier = [(p, 0) for p in start_files]
+    frontier = [(p, 0, mode) for p, mode in start_files]
     while frontier:
-        src, hop = frontier.pop(0)
+        src, hop, mode = frontier.pop(0)
         if hop >= MAX_IMPORT_HOPS:
             continue
         for token in find_imports(_read(src)):
@@ -88,6 +92,7 @@ def resolve_imports(start_files, home):
                 target = token
             else:
                 target = os.path.join(os.path.dirname(src), token)
+            target = os.path.normpath(target)
             if not os.path.isfile(target):
                 if _looks_like_path(token):
                     unresolved.append({"token": "@" + token, "imported_from": src})
@@ -96,18 +101,38 @@ def resolve_imports(start_files, home):
             if real in seen:
                 continue
             seen.add(real)
-            imported.append({"path": target, "imported_from": src, "hop": hop + 1})
-            frontier.append((target, hop + 1))
+            imported.append({"path": target, "imported_from": src, "hop": hop + 1,
+                             "parent_load_mode": mode})
+            frontier.append((target, hop + 1, mode))
     return imported, unresolved
 
 
+def memory_root(project):
+    """The main repository root for `project` (worktrees share it), or the
+    project itself outside git."""
+    out = subprocess.run(["git", "-C", project, "rev-parse", "--git-common-dir"],
+                         capture_output=True, text=True)
+    if out.returncode != 0:
+        return os.path.realpath(project)
+    common = out.stdout.strip()
+    if not os.path.isabs(common):
+        common = os.path.join(project, common)
+    return os.path.dirname(os.path.realpath(common))
+
+
+def encode_project_dir(path):
+    """Claude Code's ~/.claude/projects directory name for a path: every
+    non-alphanumeric character becomes '-' (verified against real dirs)."""
+    return re.sub(r"[^A-Za-z0-9]", "-", os.path.realpath(path))
+
+
 def automem_path(home, project):
-    """Claude Code's auto memory index for a project (path with / as -)."""
-    encoded = os.path.realpath(project).replace("/", "-")
-    return os.path.join(home, ".claude", "projects", encoded, "memory", "MEMORY.md")
+    """Claude Code's auto memory index for a project."""
+    return os.path.join(home, ".claude", "projects", encode_project_dir(memory_root(project)),
+                        "memory", "MEMORY.md")
 
 
-def _rules(rules_dir, kind):
+def _rules(rules_dir, kind, warnings):
     out = []
     if not os.path.isdir(rules_dir):
         return out
@@ -115,7 +140,10 @@ def _rules(rules_dir, kind):
         for name in sorted(files):
             if name.endswith(".md"):
                 p = os.path.join(root, name)
-                mode = "path-scoped" if rule_paths_frontmatter(_read(p)) else "always"
+                scoped = rule_paths_frontmatter(_read(p))
+                if scoped is None:
+                    warnings.append(f"{p}: frontmatter is not closed; treated as always-loaded")
+                mode = "path-scoped" if scoped else "always"
                 out.append({"path": p, "kind": kind, "load_mode": mode})
     return out
 
@@ -135,35 +163,46 @@ def _lazy_claude_mds(project):
 def collect(project, home):
     """All instruction files for `project`, as dicts {path, kind, load_mode, ...}."""
     project = os.path.realpath(project)
-    files = []
+    files, warnings, seen = [], [], set()
+
+    def add_entry(entry):
+        real = os.path.realpath(entry["path"])
+        if real in seen:
+            return
+        seen.add(real)
+        files.append(entry)
 
     def add(path, kind, mode="always"):
         if os.path.isfile(path):
-            files.append({"path": path, "kind": kind, "load_mode": mode})
+            add_entry({"path": path, "kind": kind, "load_mode": mode})
 
     add(os.path.join(home, ".claude", "CLAUDE.md"), "user")
+    # Claude Code reads CLAUDE.md in every ancestor up to, not including, "/".
     ancestors = []
     d = os.path.dirname(project)
-    while d and d != os.path.dirname(d) and os.path.realpath(d) != os.path.realpath(home):
+    while d and d != os.path.dirname(d):
         ancestors.append(d)
         d = os.path.dirname(d)
     for anc in reversed(ancestors):
         add(os.path.join(anc, "CLAUDE.md"), "ancestor")
+        add(os.path.join(anc, "CLAUDE.local.md"), "ancestor")
     add(os.path.join(project, "CLAUDE.md"), "project")
     add(os.path.join(project, ".claude", "CLAUDE.md"), "project")
     add(os.path.join(project, "CLAUDE.local.md"), "local")
     add(os.path.join(project, "AGENTS.md"), "agents")
     add(automem_path(home, project), "automem")
-    files.extend(_rules(os.path.join(home, ".claude", "rules"), "user-rule"))
-    files.extend(_rules(os.path.join(project, ".claude", "rules"), "project-rule"))
-    files.extend(_lazy_claude_mds(project))
+    for entry in (_rules(os.path.join(home, ".claude", "rules"), "user-rule", warnings)
+                  + _rules(os.path.join(project, ".claude", "rules"), "project-rule", warnings)
+                  + _lazy_claude_mds(project)):
+        add_entry(entry)
 
-    starts = [f["path"] for f in files if f["load_mode"] in ("always", "path-scoped", "lazy")]
+    starts = [(f["path"], f["load_mode"]) for f in files]
     imported, unresolved = resolve_imports(starts, home)
     for imp in imported:
-        files.append({"path": imp["path"], "kind": "import", "load_mode": "imported",
-                      "imported_from": imp["imported_from"], "hop": imp["hop"]})
-    return {"project": project, "files": files, "unresolved_imports": unresolved}
+        add_entry({"path": imp["path"], "kind": "import", "load_mode": "imported",
+                   "parent_load_mode": imp["parent_load_mode"],
+                   "imported_from": imp["imported_from"], "hop": imp["hop"]})
+    return {"project": project, "files": files, "unresolved_imports": unresolved, "warnings": warnings}
 
 
 def mark_observed(result, ledger):
@@ -180,7 +219,8 @@ def mark_observed(result, ledger):
         elif os.path.realpath(f["path"]) in loaded:
             f["observed"] = True
         else:
-            f["observed"] = False if f["load_mode"] in ("always", "imported") else None
+            always = f["load_mode"] == "always" or f.get("parent_load_mode") == "always"
+            f["observed"] = False if always else None
     result["ledger_samples"] = (inst or {}).get("samples", 0)
     return result
 
@@ -191,6 +231,8 @@ def render_markdown(result):
     for f in result["files"]:
         seen = {True: "yes", False: "no", None: "-"}[f.get("observed")]
         lines.append(f"| {f['path']} | {f['kind']} | {f['load_mode']} | {seen} |")
+    for w in result.get("warnings", []):
+        lines.append(f"Warning: {w}")
     if result["unresolved_imports"]:
         lines += ["", "## Unresolved imports", ""]
         lines += [f"- `{u['token']}` in {u['imported_from']}" for u in result["unresolved_imports"]]
