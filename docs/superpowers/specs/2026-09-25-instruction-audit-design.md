@@ -204,7 +204,27 @@ Add `TaskOutput` to `KNOWN_DEPRECATIONS`, bump `SNAPSHOT_DATE`. Add component
 unchanged (dropping it would regress Check 14's deprecated and unknown skill
 reference findings on SKILL.md).
 
-### 5. Delegation cost: extend `scripts/parse-history.py`
+### 5. Delegation cost: `scripts/delegation-cost.py`
+
+Revised 2026-09-27: a separate script rather than an extension of
+`parse-history.py`, which counts `tool_use` lines in main sessions; pricing
+subagent runs from their usage records is a different job. Findings from
+real data that shaped it: about half of assistant usage lines repeat a
+message id while streaming (each id is counted once, taking the largest value
+per field); 24% of `meta.json` files lack `model` and some say `inherit`, so
+runs are grouped by the transcript's `message.model`; `<synthetic>` messages
+are skipped. Prices come from a per-model table added to config
+(`costs.models`, from the Claude API pricing reference cached 2026-06-24)
+because Opus 5.5 ($4/$20, cache reads $0.20) and Fable 5.1 (cache reads
+$0.25) do not fit the flat input rate and 0.1x cache-read multiplier used
+elsewhere; a model with no rate is reported as unpriced.
+Spin-up cost is the whole input side of a run's first message (fresh input,
+cache writes, and cache reads), not only its cache write, since a cache hit
+on a shared prefix is also part of the price of starting a subagent. Runs
+nested under `subagents/workflows/` count (about a third of spend on the
+author's machine); forks are never savings candidates because they inherit
+the parent's model and cache.
+
 
 Subagent runs live in `<session>/subagents/agent-<id>.jsonl` with a sibling
 `agent-<id>.meta.json` holding `agentType`, `model`, `description`,

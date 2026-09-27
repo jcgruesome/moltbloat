@@ -117,6 +117,9 @@ Anthropic recommends periodically rewriting CLAUDE.md because Claude Code itself
 ### Instruction quality
 `/moltbloat:audit` finds every instruction file Claude Code loads for the project (user and project `CLAUDE.md`, ancestors, `CLAUDE.local.md`, `AGENTS.md`, rules, auto memory, `@imports`) and how each loads, then lints the always-loaded ones: two diverged copies of the same section (a conflict Claude may resolve either way), exact duplicates, emphatic wording written for older models, leftover `claude import` markers, placeholders, and files over a byte budget. For leftover import markers and sections repeated within one file it shows a suggested rewrite as a diff, and refuses any rewrite that would lose code, a URL, an `@import`, or a file path; emphasis and cross-file duplicates are reported for you to fix. It never edits your files.
 
+### Delegation cost
+`/moltbloat:usage` prices every subagent run from its own recorded tokens (per-model rates, cache writes and reads, output) and shows spend by agent type and model, the fixed cost of spinning up a fresh subagent, and Opus/Fable runs that only read files and replied briefly, re-priced on a cheaper model as a candidate rather than a verdict. `/moltbloat:audit` flags agents with no `model:` pin that have real spend, and instruction prose that asks for a model tier an agent's pin contradicts.
+
 ### Usage-aware recommendations
 Cross-references audit findings with actual usage data. A plugin with zero usage that duplicates another plugin's functionality gets flagged as high priority for removal. Usage tracking is silent and automatic.
 

@@ -87,6 +87,19 @@ def run():
     _assert(migrated["instruction_byte_budget"] == 9 and migrated["drifted_section_similarity"] == 0.6,
             "1.5 -> 1.6 migration adds lint keys and keeps customized ones")
 
+    print("Test: per-model rate table present and migrates in")
+    models = ic.DEFAULT_CONFIG["costs"]["models"]
+    _assert(models["claude-opus-5-5"] == {"input": 4.0, "output": 20.0, "cache_read": 0.20}, "Opus 5.5 rates")
+    _assert(models["claude-fable-5-1"]["cache_read"] == 0.25, "Fable 5.1 cache read is 0.025x, not 0.1x")
+    migrated_costs = ic.migrate_config({"version": "1.6", "costs": {"opus_per_1m_tokens": 5.0}})["costs"]
+    _assert("claude-sonnet-5" in migrated_costs["models"], "1.6 -> 1.7 migration adds the rate table")
+    custom = ic.migrate_config({"version": "1.6", "costs": {"models": {
+        "claude-opus-5-5": {"input": 3.0, "output": 15.0, "cache_read": 0.15},
+        "my-model": {"input": 1.0, "output": 1.0, "cache_read": 0.1}}}})["costs"]["models"]
+    _assert(custom["claude-opus-5-5"]["input"] == 3.0, "user rate override survives")
+    _assert("my-model" in custom and "claude-sonnet-5" in custom, "custom model added without losing defaults")
+    _assert(ic.DEFAULT_CONFIG["costs"]["models"]["claude-opus-5-5"]["input"] == 4.0, "defaults not mutated")
+
     print("Test: reads (get_value) never write the config file")
     import json
     import tempfile
@@ -111,6 +124,11 @@ def run():
             ic.init_config()
             with open(ic.CONFIG_PATH) as f:
                 _assert(json.load(f)["version"] == ic.CONFIG_VERSION, "init_config still migrates and writes")
+
+            with open(ic.CONFIG_PATH, "w") as f:
+                json.dump({"version": ic.CONFIG_VERSION, "costs": {"models": {"my-model": {"input": 1, "output": 1, "cache_read": 0.1}}}}, f)
+            m = ic.load_config()["costs"]["models"]
+            _assert("my-model" in m and "claude-opus-5-5" in m, "current-version file: user models merged over defaults")
         finally:
             ic.CONFIG_PATH = original_path
 

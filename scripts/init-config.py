@@ -6,7 +6,7 @@ import sys
 from datetime import datetime, timezone
 
 CONFIG_PATH = os.path.expanduser("~/.moltbloat/config.json")
-CONFIG_VERSION = "1.6"
+CONFIG_VERSION = "1.7"
 
 DEFAULT_CONFIG = {
     "version": CONFIG_VERSION,
@@ -45,7 +45,23 @@ DEFAULT_CONFIG = {
         # Prompt-cache multipliers on the base rate above: write (~once per
         # 5-min window) vs. read (every later turn reusing the cache).
         "cache_write_multiplier": 1.25,
-        "cache_read_multiplier": 0.1
+        "cache_read_multiplier": 0.1,
+        # Per-model rates per 1M tokens, matched by model-id prefix (longest
+        # wins). Source: Claude API pricing reference, cached 2026-06-24.
+        # cache_read is per model (Opus 5.5 and Fable 5.1 are not 0.1x).
+        # Used by delegation-cost.py to price subagent runs.
+        "models": {
+            "claude-fable-5-1": {"input": 10.0, "output": 50.0, "cache_read": 0.25},
+            "claude-fable-5": {"input": 10.0, "output": 50.0, "cache_read": 1.0},
+            "claude-opus-5-5": {"input": 4.0, "output": 20.0, "cache_read": 0.20},
+            "claude-opus-5": {"input": 5.0, "output": 25.0, "cache_read": 0.50},
+            "claude-opus-4-8": {"input": 5.0, "output": 25.0, "cache_read": 0.50},
+            "claude-opus-4-7": {"input": 5.0, "output": 25.0, "cache_read": 0.50},
+            "claude-opus-4-6": {"input": 5.0, "output": 25.0, "cache_read": 0.50},
+            "claude-sonnet-5": {"input": 2.0, "output": 10.0, "cache_read": 0.20},
+            "claude-sonnet-4-6": {"input": 3.0, "output": 15.0, "cache_read": 0.30},
+            "claude-haiku-4-5": {"input": 1.0, "output": 5.0, "cache_read": 0.10}
+        }
     },
     "estimates": {
         "tokens_per_byte": 0.25,
@@ -102,6 +118,16 @@ def _refresh_superseded_defaults(config):
             config[section][key] = DEFAULT_CONFIG[section][key]
 
 
+def _merge_rate_table(config, user_config):
+    """Merge `costs.models` per model id: defaults first, the user's entries
+    on top. A one-level merge would let one custom model wipe every default
+    rate, and freeze the table so later default rates never arrive."""
+    user_models = ((user_config or {}).get("costs") or {}).get("models") or {}
+    config["costs"] = dict(config.get("costs") or {})
+    config["costs"]["models"] = {**DEFAULT_CONFIG["costs"]["models"], **user_models}
+    return config
+
+
 def migrate_config(old_config):
     """Migrate old config to current schema."""
     # A shallow .copy() would leave nested dicts (costs, thresholds, ...)
@@ -119,6 +145,7 @@ def migrate_config(old_config):
             config[key] = value
 
     _refresh_superseded_defaults(config)
+    _merge_rate_table(config, old_config)
 
     # Update version and migration timestamp
     config["version"] = CONFIG_VERSION
@@ -157,7 +184,7 @@ def init_config():
                 else:
                     config[key] = value
             
-            return config
+            return _merge_rate_table(config, user_config)
             
         except (json.JSONDecodeError, IOError) as e:
             print(f"Error loading config: {e}, using defaults", file=sys.stderr)
@@ -199,7 +226,7 @@ def load_config():
             config[key] = {**config[key], **value}
         else:
             config[key] = value
-    return config
+    return _merge_rate_table(config, user_config)
 
 
 def get_value(key_path, default=None):

@@ -276,6 +276,28 @@ Show what's actually being used versus what's just sitting there consuming conte
    *every* skill, agent, and MCP server it provides is NEVER or STALE. For an idle server
    inside an active plugin, recommend disconnecting the server, not disabling the plugin.
 
+7b. **Delegation cost (subagent spend)**
+
+   Price every subagent run from its own recorded token usage:
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/delegation-cost.py" --since <stale_days> --json
+   ```
+   Add a "Delegation cost" section to the report:
+   - Measured spend, and the top rows of `by_agent_type_model` (agent type,
+     model, runs, spend). Label spend as list-price estimates, not a bill.
+   - `spin_up`: the median cost of giving each agent type a fresh context
+     (its first message). This is the fixed price of delegating at all.
+   - `mechanical_on_premium`: Opus/Fable runs that were read-only with a
+     short reply. Show each candidate's cost and its cost re-priced on the
+     suggested model. Present them as candidates to review, not verdicts,
+     and say the re-priced figure assumes the same token counts. If the list
+     is empty, say so; do not invent a saving.
+   - `unpinned_agents` with spend: the agent, its spend, and its model mix.
+     The fix is a `model:` line in the agent's frontmatter, which the user
+     edits; a prose rule in CLAUDE.md does not change the model.
+   - `unpriced_models`: name any model with no rate in `costs.models`.
+   Non-zero exit: say delegation cost is unavailable and quote stderr.
+
 8. **Compact old usage data (auto or manual)**
 
    Check if the usage file has grown large enough to benefit from compaction:
