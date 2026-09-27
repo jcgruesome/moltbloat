@@ -77,6 +77,33 @@ def run():
     _assert(migrated_th["context_ledger_samples"] == 10 and migrated_th["token_warning"] == 1,
             "migration adds new keys and keeps customized ones")
 
+    print("Test: reads (get_value) never write the config file")
+    import json
+    import tempfile
+    original_path = ic.CONFIG_PATH
+    with tempfile.TemporaryDirectory() as d:
+        try:
+            ic.CONFIG_PATH = os.path.join(d, "config.json")
+            _assert(ic.get_value("thresholds.context_ledger_samples") == 10,
+                    "missing config: get_value returns the default")
+            _assert(not os.path.exists(ic.CONFIG_PATH), "missing config: get_value does not create the file")
+
+            with open(ic.CONFIG_PATH, "w") as f:
+                json.dump({"version": "1.4", "thresholds": {"token_warning": 7}}, f)
+            with open(ic.CONFIG_PATH, "rb") as f:
+                before_bytes = f.read()
+            _assert(ic.get_value("thresholds.token_warning") == 7, "old-version config: customized value read")
+            _assert(ic.get_value("thresholds.context_ledger_samples") == 10,
+                    "old-version config: new key available via in-memory migration")
+            with open(ic.CONFIG_PATH, "rb") as f:
+                _assert(f.read() == before_bytes, "old-version config: file left byte-for-byte unchanged")
+
+            ic.init_config()
+            with open(ic.CONFIG_PATH) as f:
+                _assert(json.load(f)["version"] == ic.CONFIG_VERSION, "init_config still migrates and writes")
+        finally:
+            ic.CONFIG_PATH = original_path
+
     print("\nAll tests passed.")
 
 

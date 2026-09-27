@@ -120,6 +120,28 @@ def test_deferred_tools_missing_added_lines(d):
     _assert(len(s["format_errors"]) == 1 and "deferred_tools_delta" in s["format_errors"][0],
             "missing addedLines recorded as a format error")
 
+    print("Test: readdedNames are in addedNames but not addedLines (observed real shape)")
+    p2 = os.path.join(d, "proj-f6", "readd.jsonl")
+    write_session(p2, [
+        att({"type": "deferred_tools_delta", "addedNames": ["mcp__s1__a", "mcp__s1__b"],
+             "addedLines": ["mcp__s1__a", "mcp__s1__b"]}),
+        att({"type": "deferred_tools_delta", "addedNames": ["mcp__s1__a", "mcp__s2__c"],
+             "addedLines": ["mcp__s2__c"], "readdedNames": ["mcp__s1__a"]}),
+        att({"type": "deferred_tools_delta", "addedNames": ["mcp__s3__d"],
+             "addedLines": [], "readdedNames": ["mcp__s3__d"]}),
+    ])
+    s2 = cl.extract_session(p2)
+    _assert(s2["format_errors"] == [], "re-added names without lines are not format errors")
+    _assert(s2["deferred_tools"]["names"] == 4, "union includes re-added names")
+    _assert(s2["deferred_tools"]["by_server"] == {"s1": 22, "s2": 11, "s3": 11},
+            "re-added name counted once, using its name as its line")
+
+    print("Test: fresh names that still do not line up are a format error")
+    p3 = os.path.join(d, "proj-f6", "misaligned.jsonl")
+    write_session(p3, [att({"type": "deferred_tools_delta", "addedNames": ["a", "b"],
+                            "addedLines": ["a"], "readdedNames": []})])
+    _assert(len(cl.extract_session(p3)["format_errors"]) == 1, "misaligned fresh names still fail")
+
 
 def test_hook_context_len_empty(d):
     print("Test: hook_context_len classifies empty stdout as no_context")
