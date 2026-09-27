@@ -5,6 +5,64 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2026-09-27
+
+Measured context, instruction quality, and delegation cost. Every number is
+now labeled measured, estimated, or assumed (see Honest numbers in the README).
+
+### Added
+- **Measured context ledger** (`scripts/context-ledger.py`): reads what each
+  interactive session actually loaded from Claude Code's transcripts (skill
+  listing, deferred MCP tool names, MCP instructions, agent listing,
+  SessionStart hook output, instruction files) instead of estimating it.
+  Flags skills listed without their descriptions once the listing hits its
+  size budget, attributes hook output to its plugin, records per hook whether
+  its text is identical every session and how emphatic it is, and rolls
+  measured always-on context up per plugin (`plugin_costs`). `/moltbloat:token-budget`
+  uses it first and labels any estimate `est.` (#13, #14, #21, #22)
+- **Instruction quality, audit Check 15** (`scripts/instruction-files.py`,
+  `scripts/instruction-lint.py`): lists every instruction file Claude Code
+  loads for a project (CLAUDE.md at every level, CLAUDE.local.md, AGENTS.md,
+  rules, auto memory, `@imports`) and how, then flags drifted and exact
+  duplicate sections, emphatic wording written for older models, leftover
+  `claude import` markers, placeholders, and files over a byte budget (with
+  their measured tokens). Reports repeated and emphatic SessionStart hook
+  context. (#16, #20, #21)
+- **Delegation cost, audit Check 16** (`scripts/delegation-cost.py`): prices
+  every subagent run, including workflow runs, from its recorded tokens with
+  per-model rates; shows spend by agent type and model, spin-up cost, and
+  read-only Opus/Fable runs re-priced on a cheaper model as candidates.
+  Flags agents with no `model:` pin and prose that contradicts a pin.
+  `/moltbloat:usage` gains a Delegation cost section. (#17)
+- **Guarded fixes in `/moltbloat:clean`** (`scripts/apply-instruction-change.py`):
+  apply the lint's structural rewrite, drop one side of a drifted duplicate,
+  or pin an agent's model, one confirmed change at a time, with a diff first,
+  a required review hash, a backup under `~/.moltbloat/backups/`, and
+  refusal of plugin-owned files. (#19)
+- **Per-model rate table** (`costs.models`, config 1.7) from the Claude API
+  pricing reference, merged per model id so user overrides and new defaults
+  both survive. (#17)
+
+### Changed
+- **Opus 5.5 replaces Opus 5** in token-budget, and each model is priced from
+  its own rates: `cache-cost.py --model` reads input and cache-read rates per
+  model (Opus 5.5 reads at 0.05x, Fable 5.1 at 0.025x). Config 1.8 sets the
+  flat Opus rate to $4.00 and refreshes the old $5.00 default. Steady-state
+  dollar figures were up to 3.4x high. (#18)
+- **`/moltbloat:profile suggest`** states savings as each disabled plugin's
+  measured always-on context, not estimates. (#22)
+- **CI bloat gate** measures context cost (skill descriptions every turn,
+  SKILL.md bodies on invoke) instead of repo bytes. (#16)
+- Removed unmeasured claims from the README and token-budget. (#15)
+
+### Fixed
+- Config reads (`init-config.py --get/--dump/--validate`) no longer rewrite
+  `~/.moltbloat/config.json`; only `--init` writes. (#14)
+- token-budget no longer counts plugin-cache CLAUDE.md/AGENTS.md, which
+  never load. (#14)
+- The stale-snapshot reminder shows at most once a day instead of after every
+  response. (#15)
+
 ## [0.12.1] - 2026-09-11
 
 ### Fixed
