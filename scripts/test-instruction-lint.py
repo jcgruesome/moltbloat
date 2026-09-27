@@ -54,6 +54,21 @@ def run():
         _assert(t.count("placeholder_marker") == 2, "TODO and 'not implemented' flagged; inline code and lowercase ignored")
         _assert("import_residue" in t, "import marker flagged")
         _assert("instruction_byte_budget" in t, "over byte budget flagged")
+        m = il.lint_files([misc], byte_budget=50, measured={os.path.realpath(misc): (1234, 7)})
+        bb = [x for x in m["findings"] if x["type"] == "instruction_byte_budget"][0]
+        _assert(bb["measured_tokens"] == 1234 and "~1,234 tokens per session (median of 7 sessions)" in bb["message"],
+                "byte budget finding reports ledger-measured tokens")
+        import json as _json
+        lj = write(d, "ledger.json", _json.dumps({"sources": {"instructions": {"files": [
+            {"path": misc, "median_tokens": 99, "samples": 2}]}}}))
+        import contextlib as _cl
+        import io as _io
+        buf = _io.StringIO()
+        with _cl.redirect_stdout(buf):
+            code = il.main(["x", misc, "--byte-budget", "50", "--ledger-json", lj, "--json"])
+        got = [x for x in _json.loads(buf.getvalue())["findings"] if x["type"] == "instruction_byte_budget"][0]
+        _assert(code == 0 and got["measured_tokens"] == 99, "--ledger-json wires measured tokens through the CLI")
+        _assert(il.main(["x", misc, "--ledger-json", os.path.join(d, "nope.json")]) == 1, "missing ledger file -> 1")
 
         print("Test: duplicate vs drifted sections, across files")
         a = write(d, "a.md", WRAP_A)
