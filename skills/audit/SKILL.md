@@ -502,6 +502,23 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    edits files; applying a rewrite is `/moltbloat:clean`'s job, with
    confirmation.
 
+   ### Check 16: Delegation and Agent Model Pins
+
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/delegation-cost.py" --json \
+     --project "$(git rev-parse --show-toplevel 2>/dev/null || pwd)" \
+     --instructions "<comma-separated always-loaded paths from Check 15>"
+   ```
+   Findings:
+   - `unpinned_agents` (MEDIUM with measured spend, LOW without): an agent
+     definition with no `model:` (or `model: inherit`), so its model is
+     whatever each caller or the session picks. Show spend and model mix.
+     Fix: add `model:` to the agent's frontmatter.
+   - `prose_conflicts` (MEDIUM): an instruction line that names an agent and
+     one model tier its pin contradicts (or it has no pin). Prose does not
+     change which model an agent runs on; the frontmatter does.
+   Non-zero exit: skip this check and say why (quote stderr).
+
 4. **Classify findings**
 
    Assign severity to each finding:

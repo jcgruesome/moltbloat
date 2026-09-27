@@ -124,3 +124,6 @@ jobs:
         run: |
           python3 scripts/test-instruction-files.py
           python3 scripts/test-instruction-lint.py
+
+      - name: Run delegation cost tests
+        run: python3 scripts/test-delegation-cost.py

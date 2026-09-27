@@ -87,6 +87,13 @@ def run():
     _assert(migrated["instruction_byte_budget"] == 9 and migrated["drifted_section_similarity"] == 0.6,
             "1.5 -> 1.6 migration adds lint keys and keeps customized ones")
 
+    print("Test: per-model rate table present and migrates in")
+    models = ic.DEFAULT_CONFIG["costs"]["models"]
+    _assert(models["claude-opus-5-5"] == {"input": 4.0, "output": 20.0, "cache_read": 0.20}, "Opus 5.5 rates")
+    _assert(models["claude-fable-5-1"]["cache_read"] == 0.25, "Fable 5.1 cache read is 0.025x, not 0.1x")
+    migrated_costs = ic.migrate_config({"version": "1.6", "costs": {"opus_per_1m_tokens": 5.0}})["costs"]
+    _assert("claude-sonnet-5" in migrated_costs["models"], "1.6 -> 1.7 migration adds the rate table")
+
     print("Test: reads (get_value) never write the config file")
     import json
     import tempfile
