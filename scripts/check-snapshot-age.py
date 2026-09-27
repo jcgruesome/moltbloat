@@ -29,6 +29,16 @@ try:
     ts = data["timestamp"][:10]
     days = (datetime.date.today() - datetime.date.fromisoformat(ts)).days
     if days > STALE_DAYS:
+        # Stop fires after every response; a marker keeps the reminder to
+        # once per day instead of repeating it every turn.
+        marker_path = os.path.expanduser("~/.moltbloat/.snapshot-reminder-shown")
+        today = datetime.date.today().isoformat()
+        if os.path.exists(marker_path):
+            with open(marker_path) as f:
+                if f.read().strip() == today:
+                    sys.exit(0)
+        with open(marker_path, "w") as f:
+            f.write(today)
         print(f"[moltbloat] Last ecosystem snapshot is {days} days old. Run /moltbloat:snapshot to check for drift.")
 except Exception:
     sys.exit(0)

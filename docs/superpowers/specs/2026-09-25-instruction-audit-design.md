@@ -149,6 +149,8 @@ Checks (all structural):
 | `duplicate_section` | two sections (split on headers, normalized) with body similarity >= 0.95, within or across files | MEDIUM |
 | `drifted_duplicate` | same normalized heading or body similarity 0.6 to 0.95; shows the differing lines | HIGH (two versions of one instruction is a conflict) |
 | `import_residue` | `<!-- imported-from: ... -->` markers left by `claude import` | LOW |
+| `instruction_byte_budget` | an always-loaded instruction file over `thresholds.instruction_byte_budget` bytes; reports the file's measured tokens from the context ledger when available | LOW above budget, MEDIUM above 2x |
+| `placeholder_marker` | `TODO`, `FIXME`, `TBD`, `XXX`, or "not implemented" in instruction prose (code fences and inline code excluded): unfinished text that loads every session | LOW |
 
 Sections under 5 body lines are not compared, to avoid pairing short
 unrelated sections. Comparison is bounded: exact duplicates are found by
@@ -174,6 +176,24 @@ it does not break the "no curated opinion lists" principle.
 Drifted duplicates are never auto-merged. The diff leaves both, and `clean`
 asks which version to keep (or to keep both).
 
+Rewrite safety (adapted from caveman-compress, MIT, which does the same job
+for memory files):
+
+- **Preserve list, verified after the rewrite:** every fenced code block,
+  inline code span, URL, file path, and `@import` line must be byte-identical
+  before and after. If any differs, the rewrite for that file is discarded
+  and the original is left untouched; the finding stays report-only.
+- **Prose files only:** the rewriter refuses anything that is not Markdown
+  (no `.json`, `.py`, `.js`, frontmatter-only files).
+- **Backups out of the tree:** `~/.moltbloat/backups/<timestamp>/` (already
+  the plan), never beside the file, so Claude Code never loads a backup as a
+  live instruction file.
+
+The byte-budget and placeholder checks follow caveman's `skills/compile.mjs`,
+which fails its build when a skill exceeds `prompt_byte_budget` or ships
+placeholder markers. moltbloat applies the same idea to a user's
+instruction files as findings, not build failures.
+
 ### 4. `claude-md-staleness.py`: refresh deprecations
 
 Add `TaskOutput` to `KNOWN_DEPRECATIONS`, bump `SNAPSHOT_DATE`. Add component
@@ -197,6 +217,11 @@ Subagent runs live in `<session>/subagents/agent-<id>.jsonl` with a sibling
 - `mechanical_on_premium`: runs on the top two tiers whose tool calls were all
   read-only (Read/Grep/Glob/read-only Bash) and whose final output was short;
   reported as candidates, not verdicts
+- Any saving shown for moving work to a cheaper model compares against the
+  realistic alternative (the same runs priced on the suggested tier, using
+  their measured tokens), never against zero. caveman's eval harness
+  (`evals/README.md`) documents why comparing against no alternative
+  inflated its own earlier numbers.
 
 Agent inventory: every agent definition in `~/.claude/agents/`, project
 `.claude/agents/`, and enabled plugins, with its `model:` value or "inherits".
@@ -229,6 +254,13 @@ Surfaces:
   agent model" (shows the one-line frontmatter change, confirm per agent;
   suggested tier from observed runs, user picks). Back up each file to
   `~/.moltbloat/backups/<timestamp>/` before writing.
+- `audit`: new finding `repeated_hook_context`: a SessionStart hook that
+  injects the same content in every sampled session (MEDIUM when over 1,000
+  chars). Suggested fix, for the plugin's author or a local override: show
+  one-time content once, behind a marker file, as caveman's
+  `src/hooks/caveman-activate.js` does for its setup nudge. Needs the ledger
+  to record a content hash per hook command per session (a small addition
+  to component 1).
 - `help`, `README.md`, `CLAUDE.md`: document the new checks, and add
   `~/.moltbloat/backups/` to the CLAUDE.md "Data Files" list.
 
@@ -238,9 +270,14 @@ Surfaces:
 thresholds.instruction_emphasis_per_100_lines: 3
 thresholds.duplicate_section_similarity: 0.95
 thresholds.drifted_section_similarity: 0.6
+thresholds.instruction_byte_budget: 25000
 thresholds.context_ledger_samples: 10
 thresholds.context_ledger_max_sessions: 100
 ```
+
+`instruction_byte_budget` defaults to 25,000 bytes, the size Claude Code's
+memory docs give as the load limit for auto memory; it is a starting
+default, not a measured optimum.
 
 ## Error handling
 

@@ -106,3 +106,6 @@ jobs:
 
       - name: Run context ledger tests
         run: python3 scripts/test-context-ledger.py
+
+      - name: Run snapshot reminder tests
+        run: python3 scripts/test-check-snapshot-age.py

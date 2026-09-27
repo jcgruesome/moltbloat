@@ -74,7 +74,7 @@ claude plugin install moltbloat
 `/moltbloat:usage` mines Claude Code's own session transcripts (`~/.claude/projects/`) to show exactly what you use vs what's just consuming context — **immediately, from your first run**, no waiting for data to accumulate. Every component is tiered by recency (**active** / **stale** / **never used**), and never-used MCPs, plugins, and agents come with the exact disable command. A silent PostToolUse hook supplements this with forward-looking corroboration.
 
 ### Ecosystem profiles
-Switch between `lean` (2-3 plugins, ~5K tokens) and `full` (everything, ~40K+ tokens) with one command. Or create custom profiles for frontend, backend, or project-specific work.
+Switch between `lean` (2-3 plugins) and `full` (everything) with one command; `/moltbloat:token-budget` measures what each costs on your machine. Or create custom profiles for frontend, backend, or project-specific work.
 
 ### Real dollar costs
 Token-budget shows the actual dollar cost of your ecosystem overhead:
@@ -83,6 +83,21 @@ Token-budget shows the actual dollar cost of your ecosystem overhead:
 - Per month
 - Caching-aware: shows both the turn-1 uncached ceiling and the realistic turn-2+ steady-state price once static ecosystem content (CLAUDE.md, rules, skill listings, MCP tool defs) is prompt-cached — pricing every message at full rate overstates real cost 5-10x past one turn
 - Context-window percentage is computed against the model's actual window (Haiku 4.5's 200K vs. 1M for Opus 5/Sonnet 5/Fable 5.1), not a flat 1M
+
+### Honest numbers
+Every number moltbloat reports is one of three kinds, and the report says which:
+
+- **Measured**: read from Claude Code's own session transcripts by `scripts/context-ledger.py` (skill listing, deferred tool names, MCP instructions, agent listing, SessionStart hook output, instruction files). Rows show how many sessions they were sampled from.
+- **Estimated**: computed from file sizes or config values when no transcript data exists, marked `est.`.
+- **Assumed**: inputs such as 200 messages a day or the response sizes in the effort table. These are illustrative, not observed.
+
+Known limits:
+- The transcript records the ledger reads are undocumented Claude Code internals. If their format changes, the ledger fails with an error rather than guessing.
+- Automated SDK sessions are skipped by default.
+- Dollar figures are list-price estimates of fixed overhead, not a bill.
+- moltbloat does not claim savings it has not measured. A saving is only stated as the measured cost of the thing you would remove.
+
+Retracted: before the context ledger, token-budget priced every MCP tool at ~350 tokens. With deferred tools only names are in context until a tool is used, so that figure overstated MCP cost; it is now used only when no measurement exists, and labeled `est.`.
 
 ### Compatibility detection
 Finds plugin conflicts before they cause mysterious behavior: hook collisions, skill name shadowing, duplicate MCP tools. Smart duplicate detection identifies semantic overlaps (e.g., two Vercel deployment plugins) even with different names. Skill collision detection covers `.claude/skills/` too — Claude Code auto-loads skills from there directly, no plugin install required, so a local skill silently shadowing a plugin's skill of the same name is caught, not just plugin-vs-plugin collisions.
@@ -103,7 +118,7 @@ Anthropic recommends periodically rewriting CLAUDE.md because Claude Code itself
 Cross-references audit findings with actual usage data. A plugin with zero usage that duplicates another plugin's functionality gets flagged as high priority for removal. Usage tracking is silent and automatic.
 
 ### Smart cleanup
-The `profile suggest` command analyzes your ecosystem + usage + audit findings to recommend an optimized profile. One command can reduce your token overhead by 30-50%.
+The `profile suggest` command analyzes your ecosystem + usage + audit findings to recommend an optimized profile. It shows an estimated token and cost saving for the suggested profile (an estimate; see Honest numbers above).
 
 ### Configuration
 Customize thresholds, costs, and defaults in `~/.moltbloat/config.json`:

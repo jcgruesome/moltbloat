@@ -271,6 +271,11 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
    regardless of what you're doing; actual message content and tool results
    are on top of this.
 
+   **Label these as estimates, not a bill.** They multiply token counts by
+   list prices from config. They leave out output tokens, tool results,
+   conversation history, and any discounts, so say so in the report. The
+   provider's usage report is the source of truth for what was spent.
+
    ## Context Pressure
 
    Calculate what percentage of the context window is consumed by ecosystem overhead alone (before any user messages, tool results, or conversation history). Divide by the active model's actual window from `costs.context_windows`, not a flat 1M — for a Haiku 4.5 user this denominator is 200,000, so the same overhead reads as a 5x larger percentage than it would for Opus 5/Sonnet 5/Fable 5.1:
@@ -289,9 +294,8 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
 
    If overhead exceeds 5% of the active window:
    > **Context pressure: HIGH** — At <Y>% ecosystem overhead, you're losing
-   > significant working context. This means more frequent `/compact` cycles and
-   > degraded performance in the last 20% of your context window. Strongly
-   > recommend reviewing the top consumers above.
+   > significant working context. This means more frequent `/compact` cycles.
+   > Strongly recommend reviewing the top consumers above.
 
    ## Effort Setting Impact
 
@@ -300,12 +304,15 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
    ```
    Your ecosystem costs ~<X> tokens/message regardless of effort level.
 
-   | Effort | Typical response | Ecosystem as % of message |
+   | Effort | Assumed response | Ecosystem as % of message |
    |--------|-----------------|--------------------------|
    | low    | ~2K tokens      | <X / (X+2000) * 100>%   |
    | medium | ~8K tokens      | <X / (X+8000) * 100>%   |
    | high   | ~20K tokens     | <X / (X+20000) * 100>%  |
    ```
+
+   The response sizes are illustrative assumptions, not measurements; say so
+   under the table.
 
    If ecosystem overhead is >30K tokens:
    > **Tip**: With <X> tokens of ecosystem overhead, `/effort low` still costs
@@ -313,6 +320,11 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
    > your response. Use `/moltbloat:profile lean` to make `/effort low` truly lean.
 
    ## Recommendations
+
+   Never state a saving (a percentage, a token count, or dollars) for
+   removing or disabling something unless it comes from this report's own
+   measured rows. "Disabling X removes its measured N tokens per session" is
+   fine; "cut your overhead by 30-50%" is not.
    - Items consuming >5% of context with low/no usage should be reviewed
    - Consider disabling language rules you don't actively use
    - MCP tools are a hidden cost. If `deferred_tools` was measured, cite the
@@ -322,7 +334,8 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
      when `deferred_tools` is in `missing` (est. path), fall back to the
      estimate: each registered tool consumes roughly 350 tokens.
    - Use `/moltbloat:profile lean` to cut costs for simple tasks
-   - For long sessions, `/compact` at ~60% context to maintain quality
+   - For long sessions, consider `/compact` before the window fills (a rule
+     of thumb, not a measured threshold)
    - Run `/moltbloat:usage` to see which costly components you actually use
    - Run `/moltbloat:audit` for full redundancy analysis
    ```
