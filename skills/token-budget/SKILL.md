@@ -85,8 +85,10 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
      stderr verbatim, then use estimates for every row marked est.
 
    The 2a to 2g measurements below still run: they supply rows the ledger
-   does not cover (per-plugin breakdown, rules not seen loaded) and the
-   fallbacks above.
+   does not cover (rules not seen loaded) and the fallbacks above.
+   Per-plugin cost comes from the ledger's attribution (`by_server`,
+   `skill_listing.by_owner`, `hook_context.by_owner`), shown under "Where
+   the ledger points".
 
    **2a. CLAUDE.md files**
    These are always loaded into context:
@@ -112,25 +114,13 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
    done
    ```
 
-   **2c. Plugin CLAUDE.md and instructions**
-   Each enabled plugin can inject instructions:
-   ```bash
-   for plugin_dir in ~/.claude/plugins/cache/*/*/; do
-     name=$(basename "$plugin_dir")
-     size=0
-     # Check CLAUDE.md
-     if [ -f "$plugin_dir/CLAUDE.md" ]; then
-       s=$(wc -c < "$plugin_dir/CLAUDE.md")
-       size=$((size + s))
-     fi
-     # Check AGENTS.md
-     if [ -f "$plugin_dir/AGENTS.md" ]; then
-       s=$(wc -c < "$plugin_dir/AGENTS.md")
-       size=$((size + s))
-     fi
-     echo "$name: $size bytes"
-   done
-   ```
+   **2c. Plugin CLAUDE.md and AGENTS.md: not counted**
+   A plugin's own `CLAUDE.md` or `AGENTS.md` in `~/.claude/plugins/cache/`
+   is not loaded into your session. The ledger's `instructions` records list every instruction
+   file a session actually loaded, and plugin-cache files do not appear
+   there. Do not add them to the budget. What a plugin does inject (skill
+   listing entries, MCP tools and instructions, SessionStart hook output)
+   is already measured per plugin by the ledger.
 
    **2d. MCP tool definitions**
    Each MCP server registers tools that consume context. Count the number of MCP tools visible in the current session by checking deferred tools:
@@ -194,8 +184,6 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
    | Rules (common) | X | X | X% | est. | Always loaded |
    | Rules (typescript) | X | X | X% | est. | Language-specific |
    | Rules (python) | X | X | X% | est. | Language-specific |
-   | ... | ... | ... | ... | ... | ... |
-   <one row per installed plugin with actual byte/token measurements>
    | ... | ... | ... | ... | ... | ... |
    <one row per other file in `sources.instructions.files` not already
    covered above, e.g. an AutoMem `MEMORY.md` or an ancestor-directory
