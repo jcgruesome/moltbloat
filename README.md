@@ -130,7 +130,7 @@ The context ledger records, for each SessionStart hook, how much text it injects
 Cross-references audit findings with actual usage data. A plugin with zero usage that duplicates another plugin's functionality gets flagged as high priority for removal. Usage tracking is silent and automatic.
 
 ### Smart cleanup
-The `profile suggest` command analyzes your ecosystem + usage + audit findings to recommend an optimized profile. It shows an estimated token and cost saving for the suggested profile (an estimate; see Honest numbers above).
+The `profile suggest` command analyzes your ecosystem + usage + audit findings to recommend an optimized profile. It states the saving as each disabled plugin's measured always-on context per session, from the context ledger (skill listing entries, deferred MCP tool names, MCP instructions, hook output); plugins with no measurement are shown as "not measured", not guessed.
 
 ### Configuration
 Customize thresholds, costs, and defaults in `~/.moltbloat/config.json`:
