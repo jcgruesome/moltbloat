@@ -465,13 +465,19 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
 
    **Lint the files that load every session**: every file whose `load_mode`
    is `always`, plus `imported` files whose `parent_load_mode` is `always`,
-   with thresholds from config:
+   with thresholds from config. Pass the ledger too (one Bash call, same
+   temp-file pattern) so an over-budget file reports its measured tokens;
+   if the ledger was unavailable above, drop the `--ledger-json` part:
    ```bash
-   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/instruction-lint.py" <paths> --json \
+   project="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+   ledger_json="$(mktemp)"
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/context-ledger.py" --json --project "$project" > "$ledger_json"
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/instruction-lint.py" <paths> --json --ledger-json "$ledger_json" \
      --emphasis-per-100 "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get thresholds.instruction_emphasis_per_100_lines)" \
      --duplicate-similarity "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get thresholds.duplicate_section_similarity)" \
      --drifted-similarity "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get thresholds.drifted_section_similarity)" \
      --byte-budget "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get thresholds.instruction_byte_budget)"
+   rm -f "$ledger_json"
    ```
 
    Findings (severity comes from the script):
@@ -490,6 +496,20 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
      always-loaded file with `observed: false` (LOW: present but never seen
      loaded in the ledger's sampled sessions for this project; say how many
      were sampled).
+
+   **SessionStart hook context** (from the ledger JSON above,
+   `sources.hook_context.hooks`; skip if the ledger was unavailable). These
+   are report-only: hook output belongs to the plugin (or settings file)
+   named in `owner`, so the fix is upstream, a local override, or disabling
+   the plugin.
+   - `repeated_hook_context` (MEDIUM): `same_every_session` is true and
+     `median_chars` is over 1,000. The hook injects identical text at every
+     session start. Suggest showing one-time content once, behind a marker
+     file, as caveman does for its setup nudge.
+   - `hook_emphasis` (LOW, MEDIUM above 2x): `emphasis_per_100` is over
+     `thresholds.instruction_emphasis_per_100_lines`. The same over-triggering
+     risk as emphatic CLAUDE.md wording, in text the user did not write.
+   Report the owner, samples, and size for each.
 
    **Suggested rewrite**: for each file with an `import_residue` or
    within-file `duplicate_section` finding, show the diff from

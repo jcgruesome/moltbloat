@@ -87,11 +87,13 @@ def test_extract_session(d):
         {"path": "/u/.claude/CLAUDE.md", "type": "User", "chars": 100},
         {"path": "/p/CLAUDE.md", "type": "Project", "chars": 30}], "instruction files with sizes")
     _assert(s["hook_merged"]["chars"] == 55, "merged hook context sums the content list")
-    _assert(s["hooks"] == [
+    _assert([{k: h[k] for k in ("command", "status", "chars")} for h in s["hooks"]] == [
         {"command": "cmd-a", "status": "context", "chars": 40},
         {"command": "cmd-b", "status": "no_context", "chars": 0},
         {"command": "cmd-c", "status": "unparsed", "chars": 0}],
         "only first SessionStart batch; other events and later batches ignored")
+    _assert(len(s["hooks"][0]["text_sha"]) == 40 and "text_sha" not in s["hooks"][1],
+            "context hooks carry a text hash; others do not")
     _assert(s["format_errors"] == [], "no format errors; truncated tail line skipped")
 
     print("Test: mismatched arrays are a format error, not a guess")
@@ -274,6 +276,21 @@ def test_build_ledger(d):
     _assert(hc["median_chars"] == 50, "merged total (70) used for a, per-command sum (30) for b; median 50")
     _assert(hc["by_owner"] == {"alpha": 40, "unattributed": 20}, "owner medians; unknown command unattributed")
     _assert(hc["no_context_outputs"] == 1, "JSON without additionalContext tallied")
+    per = {h["command"]: h for h in hc["hooks"]}
+    _assert(per["cmd-a"]["samples"] == 2 and per["cmd-a"]["owner"] == "alpha", "per-hook summary across sessions")
+    _assert(per["cmd-a"]["distinct_texts"] == 2 and not per["cmd-a"]["same_every_session"],
+            "different text across sessions is not 'same every session'")
+    _assert(not per["cmd-z"]["same_every_session"], "a hook seen in one session is not judged repeated")
+
+    print("Test: identical hook text in every session, and emphasis in hook text")
+    root2 = os.path.join(d, "projects-hooks")
+    loud = json.dumps({"hookSpecificOutput": {"additionalContext": "<EXTREMELY_IMPORTANT>\nYou MUST do it.\nALWAYS.\n"}})
+    for k in range(3):
+        listing_session(os.path.join(root2, "p", f"h{k}.jsonl"), 50, 1000 + k, hook_stdouts=[("cmd-loud", loud)])
+    led_h = cl.build_ledger(cl.find_sessions(root2), 10, 100, {"cmd-loud": "shouty"}, {}, 0.25)
+    h = led_h["sources"]["hook_context"]["hooks"][0]
+    _assert(h["same_every_session"] and h["distinct_texts"] == 1 and h["samples"] == 3, "identical text flagged")
+    _assert(h["emphasis_hits"] == 3 and h["emphasis_per_100"] > 3, "emphasis counted in hook text")
     _assert("deferred_tools" in led["missing"] and "deferred_tools" not in src, "absent type listed as missing, not zero")
 
     print("Test: samples cap stops collecting a type early")
