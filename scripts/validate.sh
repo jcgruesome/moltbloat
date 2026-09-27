@@ -157,6 +157,15 @@ else
   ((ERRORS++))
 fi
 
+for s_name in instruction-files instruction-lint; do
+  if python3 -m py_compile "$PLUGIN_ROOT/scripts/$s_name.py" 2>/dev/null; then
+    echo "  ✓ $s_name.py: syntax valid"
+  else
+    echo "  ✗ $s_name.py: syntax errors"
+    ((ERRORS++))
+  fi
+done
+
 echo ""
 echo "Running unit tests..."
 
@@ -183,6 +192,16 @@ else
   echo "  ✗ test-context-ledger.py: FAILED"
   ((ERRORS++))
 fi
+
+# instruction-files and instruction-lint: deterministic fixture-based tests
+for t in test-instruction-files test-instruction-lint; do
+  if python3 "$PLUGIN_ROOT/scripts/$t.py" >/dev/null 2>&1; then
+    echo "  ✓ $t.py: all assertions pass"
+  else
+    echo "  ✗ $t.py: FAILED"
+    ((ERRORS++))
+  fi
+done
 
 # check-snapshot-age: Stop-hook reminder prints at most once a day
 if python3 "$PLUGIN_ROOT/scripts/test-check-snapshot-age.py" >/dev/null 2>&1; then

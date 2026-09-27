@@ -416,9 +416,9 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    snapshot of Claude Code's changelog/docs, unlike Check 1/`phantom_refs`
    (internal dead references/collisions only — no duplication here).
 
-   **Collect files**: `~/.claude/CLAUDE.md`, the nearest project `CLAUDE.md`
-   (`git rev-parse --show-toplevel`), and every `SKILL.md` under active
-   plugin install paths (reuse Check 1's inventory).
+   **Collect files**: every instruction file from Check 15's
+   `instruction-files.py` run (all load modes), plus every `SKILL.md` under
+   active plugin install paths (reuse Check 1's inventory).
 
    **Build known-skill-refs** (no hardcoded names): the same skill inventory
    from step 2c/Check 1, as `plugin:skill` and bare `skill` strings.
@@ -426,7 +426,7 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    **Run**:
    ```bash
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/claude-md-staleness.py" \
-     ~/.claude/CLAUDE.md <project CLAUDE.md if found> <collected SKILL.md paths> \
+     <instruction file paths from Check 15> <collected SKILL.md paths> \
      --known-skill-refs "$(echo "$known_skills" | paste -sd, -)" \
      --verbose-threshold "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get thresholds.claude_md_verbose_lines)"
    ```
@@ -441,6 +441,66 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    Map severities directly (`deprecated_reference`/`unknown_skill_reference`
    → MEDIUM/HIGH; `verbose`/`unstructured` → LOW). Include the script's table
    in the report; report-only, never rewrites the user's files.
+
+   ### Check 15: Instruction Quality
+
+   Run this before Check 14, which reuses its file list.
+
+   **Find the instruction files** Claude Code loads for this project, and how
+   each loads (always, path-scoped, lazy, or imported via `@path`). Run this
+   as one Bash call so the temp file survives:
+   ```bash
+   project="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+   ledger_json="$(mktemp)"
+   if python3 "${CLAUDE_PLUGIN_ROOT}/scripts/context-ledger.py" --json --project "$project" > "$ledger_json"; then
+     python3 "${CLAUDE_PLUGIN_ROOT}/scripts/instruction-files.py" --project "$project" --ledger-json "$ledger_json" --json
+   else
+     echo "LEDGER_UNAVAILABLE"
+     python3 "${CLAUDE_PLUGIN_ROOT}/scripts/instruction-files.py" --project "$project" --json
+   fi
+   rm -f "$ledger_json"
+   ```
+   If the output starts with `LEDGER_UNAVAILABLE`, say the "seen loaded"
+   column is unavailable and quote the ledger's stderr.
+
+   **Lint the files that load every session**: every file whose `load_mode`
+   is `always`, plus `imported` files whose `parent_load_mode` is `always`,
+   with thresholds from config:
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/instruction-lint.py" <paths> --json \
+     --emphasis-per-100 "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get thresholds.instruction_emphasis_per_100_lines)" \
+     --duplicate-similarity "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get thresholds.duplicate_section_similarity)" \
+     --drifted-similarity "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get thresholds.drifted_section_similarity)" \
+     --byte-budget "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get thresholds.instruction_byte_budget)"
+   ```
+
+   Findings (severity comes from the script):
+   - `drifted_duplicate` (HIGH): two diverged versions of one section; show
+     the `differences` lines so the user can pick one. Never merge them.
+   - `duplicate_section` (MEDIUM): an exact or near-exact copy, within or
+     across files.
+   - `emphasis_density` (LOW/MEDIUM): emphatic wording written for older
+     models, which newer models tend to over-apply. Report-only: rewording
+     needs the user's judgment.
+   - `instruction_byte_budget` (LOW/MEDIUM), `placeholder_marker` (LOW),
+     `import_residue` (LOW).
+   - From `instruction-files.py`: each `unresolved_imports` entry (MEDIUM:
+     an `@path` that loads nothing; relative imports resolve from the
+     importing file's directory), each `warnings` entry (LOW), and each
+     always-loaded file with `observed: false` (LOW: present but never seen
+     loaded in the ledger's sampled sessions for this project; say how many
+     were sampled).
+
+   **Suggested rewrite**: for each file with an `import_residue` or
+   within-file `duplicate_section` finding, show the diff from
+   `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/instruction-lint.py" --suggest-rewrite <file>`.
+   It only removes `claude import` markers and sections that exactly repeat
+   an earlier section of the same file (same heading path, identical
+   subtree). Exit 3 means it refused (non-Markdown, CRLF, or it would have
+   lost code, a URL, an `@import`, or a file path); say so. Cross-file
+   duplicates, drifted pairs, and emphasis stay report-only. This check never
+   edits files; applying a rewrite is `/moltbloat:clean`'s job, with
+   confirmation.
 
 4. **Classify findings**
 

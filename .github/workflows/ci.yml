@@ -55,20 +55,30 @@ jobs:
           fi
           echo "No duplicate skill names found."
 
-      - name: Check total size
+      - name: Check context cost
         run: |
-          # Measures what the plugin ships: design docs and test scripts are
-          # never loaded into a user's context, so they are excluded.
-          total_bytes=$(find . -type f -not -path './.git/*' -not -path './docs/*' \
-            -not -path './scripts/test-*' -exec cat {} \; 2>/dev/null | wc -c)
-          echo "Total bytes (excluding docs/ and scripts/test-*): $total_bytes"
-          # Soft limit at 260KB, hard limit at 320KB
-          if [ "$total_bytes" -gt 320000 ]; then
-            echo "ERROR: Plugin size exceeds 320KB. Consider reducing documentation or merging skills."
+          # Gates what can enter a user's context, not repo bytes: scripts,
+          # docs, and tests never load. Skill descriptions sit in the skill
+          # listing every turn; a SKILL.md body loads when the skill runs.
+          desc_chars=0
+          for f in skills/*/SKILL.md; do
+            n=$(awk '/^---/{c++; next} c==1 && /^description:/{sub(/^description: */,""); printf "%s", $0}' "$f" | wc -c)
+            desc_chars=$((desc_chars + n))
+          done
+          body_bytes=$(cat skills/*/SKILL.md | wc -c)
+          echo "Skill descriptions (every turn): $desc_chars chars"
+          echo "Skill bodies (on invoke): $body_bytes bytes"
+          # Baseline 2026-09-26: 1,530 chars, 111,203 bytes
+          if [ "$desc_chars" -gt 2500 ]; then
+            echo "ERROR: skill descriptions exceed 2,500 chars; they load every turn."
             exit 1
           fi
-          if [ "$total_bytes" -gt 260000 ]; then
-            echo "WARNING: Plugin size ($total_bytes bytes) is getting large."
+          if [ "$body_bytes" -gt 150000 ]; then
+            echo "ERROR: SKILL.md bodies exceed 150KB. Move detail into scripts or merge skills."
+            exit 1
+          fi
+          if [ "$desc_chars" -gt 2000 ] || [ "$body_bytes" -gt 130000 ]; then
+            echo "WARNING: context cost is getting large."
           fi
 
   test-scripts:
@@ -109,3 +119,8 @@ jobs:
 
       - name: Run snapshot reminder tests
         run: python3 scripts/test-check-snapshot-age.py
+
+      - name: Run instruction lint tests
+        run: |
+          python3 scripts/test-instruction-files.py
+          python3 scripts/test-instruction-lint.py

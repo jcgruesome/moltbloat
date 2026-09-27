@@ -77,6 +77,16 @@ def run():
     _assert(migrated_th["context_ledger_samples"] == 10 and migrated_th["token_warning"] == 1,
             "migration adds new keys and keeps customized ones")
 
+    print("Test: instruction lint thresholds have defaults and migrate in")
+    th = ic.DEFAULT_CONFIG["thresholds"]
+    _assert(th["instruction_emphasis_per_100_lines"] == 3, "emphasis threshold default 3")
+    _assert(th["duplicate_section_similarity"] == 0.95, "duplicate similarity default 0.95")
+    _assert(th["drifted_section_similarity"] == 0.6, "drifted similarity default 0.6")
+    _assert(th["instruction_byte_budget"] == 25000, "byte budget default 25000")
+    migrated = ic.migrate_config({"version": "1.5", "thresholds": {"instruction_byte_budget": 9}})["thresholds"]
+    _assert(migrated["instruction_byte_budget"] == 9 and migrated["drifted_section_similarity"] == 0.6,
+            "1.5 -> 1.6 migration adds lint keys and keeps customized ones")
+
     print("Test: reads (get_value) never write the config file")
     import json
     import tempfile

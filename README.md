@@ -114,6 +114,9 @@ All checks are structural — no hardcoded plugin names or curated opinion lists
 ### CLAUDE.md / SKILL.md staleness
 Anthropic recommends periodically rewriting CLAUDE.md because Claude Code itself changes fast enough to make old instructions stale. `/moltbloat:audit` cross-references your CLAUDE.md and SKILL.md files against a dated snapshot of Claude Code's own changelog (renamed/removed commands, removed config keys, capability changes) alongside verbosity and structure heuristics and slash-command references that no longer resolve. The deprecation table is a documented snapshot, not a live feed, and this check never rewrites your files, only reports.
 
+### Instruction quality
+`/moltbloat:audit` finds every instruction file Claude Code loads for the project (user and project `CLAUDE.md`, ancestors, `CLAUDE.local.md`, `AGENTS.md`, rules, auto memory, `@imports`) and how each loads, then lints the always-loaded ones: two diverged copies of the same section (a conflict Claude may resolve either way), exact duplicates, emphatic wording written for older models, leftover `claude import` markers, placeholders, and files over a byte budget. For leftover import markers and sections repeated within one file it shows a suggested rewrite as a diff, and refuses any rewrite that would lose code, a URL, an `@import`, or a file path; emphasis and cross-file duplicates are reported for you to fix. It never edits your files.
+
 ### Usage-aware recommendations
 Cross-references audit findings with actual usage data. A plugin with zero usage that duplicates another plugin's functionality gets flagged as high priority for removal. Usage tracking is silent and automatic.
 
