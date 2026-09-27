@@ -332,6 +332,43 @@ def _session_hook_context(s, hook_owners):
     return total, by_owner, no_ctx, unparsed
 
 
+def installed_plugin_names(config_dir):
+    """Plugin names (the part before @) from installed_plugins.json."""
+    manifest = os.path.join(config_dir, "plugins", "installed_plugins.json")
+    if not os.path.isfile(manifest):
+        return []
+    with open(manifest, encoding="utf-8") as f:
+        return sorted({k.split("@", 1)[0] for k in (json.load(f).get("plugins") or {})})
+
+
+def plugin_costs(sources, plugin_names, tokens_per_byte):
+    """Measured always-on context per plugin: its skill listing entries,
+    deferred MCP tool names (servers named plugin_<name>_*), MCP server
+    instructions (plugin:<name>:*), and SessionStart hook output. This is
+    what disabling the plugin removes from every session; MCP tool schemas
+    and skill bodies load on use and are not counted."""
+    listing = (sources.get("skill_listing") or {}).get("by_owner") or {}
+    deferred = (sources.get("deferred_tools") or {}).get("by_server") or {}
+    mcp = (sources.get("mcp_instructions") or {}).get("by_server") or {}
+    hooks = (sources.get("hook_context") or {}).get("by_owner") or {}
+    out = {}
+    # Longest names first, so plugin "a-b" is not also counted under "a".
+    names = sorted(plugin_names, key=len, reverse=True)
+    claimed_d, claimed_m = set(), set()
+    for name in names:
+        parts = {"skill_listing": listing.get(name, 0), "hook_context": hooks.get(name, 0)}
+        d = [srv for srv in deferred if srv.startswith(f"plugin_{name}_") and srv not in claimed_d]
+        m = [srv for srv in mcp if srv.startswith(f"plugin:{name}:") and srv not in claimed_m]
+        claimed_d.update(d)
+        claimed_m.update(m)
+        parts["deferred_tools"] = sum(deferred[x] for x in d)
+        parts["mcp_instructions"] = sum(mcp[x] for x in m)
+        total = sum(parts.values())
+        if total:
+            out[name] = dict(parts, total_chars=total, total_tokens=int(round(total * tokens_per_byte)))
+    return dict(sorted(out.items(), key=lambda kv: -kv[1]["total_chars"]))
+
+
 def build_ledger(files, samples, max_sessions, hook_owners, skill_descs, tokens_per_byte,
                  include_sdk=False, project=None):
     collected = {k: [] for k in ALL_SOURCES}
@@ -521,6 +558,7 @@ def main(argv):
         sys.stderr.write(f"error: no interactive sessions among {len(files)} transcripts "
                          f"(skipped: {ledger['skipped_entrypoints']}); pass --include-sdk to measure them\n")
         return 1
+    ledger["plugin_costs"] = plugin_costs(ledger["sources"], installed_plugin_names(config_dir), tpb)
     print(json.dumps(ledger, indent=2) if as_json else render_markdown(ledger))
     return 0
 

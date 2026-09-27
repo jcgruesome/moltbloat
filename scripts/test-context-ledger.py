@@ -386,9 +386,33 @@ def test_cli(d):
     _assert(cl.main(["x", "--projects-dir", good, "--config-dir", cfg]) == 0, "markdown run succeeds")
 
 
+def test_plugin_costs(d):
+    print("Test: plugin_costs rolls measured context up per plugin")
+    sources = {
+        "skill_listing": {"by_owner": {"alpha": 100, "(local)": 50}},
+        "deferred_tools": {"by_server": {"plugin_alpha_srv": 200, "plugin_alpha-pro_srv": 70, "claude_ai_X": 999}},
+        "mcp_instructions": {"by_server": {"plugin:alpha:srv": 40, "claude.ai X": 5}},
+        "hook_context": {"by_owner": {"alpha": 10, "unattributed": 3}},
+    }
+    costs = cl.plugin_costs(sources, ["alpha", "alpha-pro", "idle"], 0.25)
+    _assert(costs["alpha"] == {"skill_listing": 100, "hook_context": 10, "deferred_tools": 200,
+                               "mcp_instructions": 40, "total_chars": 350, "total_tokens": 88},
+            "listing + deferred + mcp + hooks for alpha")
+    _assert(costs["alpha-pro"]["deferred_tools"] == 70 and costs["alpha"]["deferred_tools"] == 200,
+            "longer plugin name claims its own servers, not alpha's")
+    _assert("idle" not in costs, "plugin with no measured context omitted")
+    cfg = os.path.join(d, "cfg-pc", "plugins")
+    os.makedirs(cfg)
+    with open(os.path.join(cfg, "installed_plugins.json"), "w") as f:
+        json.dump({"plugins": {"alpha@m": [], "beta@n": []}}, f)
+    _assert(cl.installed_plugin_names(os.path.dirname(cfg)) == ["alpha", "beta"], "plugin names from manifest")
+    _assert(cl.installed_plugin_names(os.path.join(d, "none")) == [], "no manifest -> no plugins")
+
+
 def run():
     with tempfile.TemporaryDirectory() as d:
         test_extract_session(d)
+        test_plugin_costs(d)
         test_deferred_tools_missing_added_lines(d)
         test_hook_context_len_empty(d)
         test_hook_additional_context_event_filter(d)

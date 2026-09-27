@@ -195,7 +195,8 @@ Manage named profiles that enable/disable specific plugins and rule sets. Switch
    <list each plugin with >0 invocations, sorted by count>
 
    These had zero usage and can be safely disabled:
-   <list each plugin with 0 invocations and estimated token savings>
+   <list each plugin with 0 invocations and its measured tokens per session
+   from `plugin_costs` (see 6b), or "not measured" if it has no entry>
 
    Save as profile? (name it, or "skip")
    ```
@@ -226,9 +227,21 @@ Manage named profiles that enable/disable specific plugins and rule sets. Switch
    **TIER 4 — Safe to Disable (unused + redundant):**
    <plugins with 0 usage AND overlapping functionality>
 
-   Calculate potential savings:
-   - Token reduction: ~X tokens (Y% of current)
-   - Cost savings: ~$Z per message
+   Calculate potential savings from measured data, not estimates:
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/context-ledger.py" --json \
+     --project "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+   ```
+   `plugin_costs` gives each plugin's measured always-on context per session
+   (skill listing entries, deferred MCP tool names, MCP server instructions,
+   SessionStart hook output). The saving from disabling a set of plugins is
+   the sum of their `total_tokens`. A plugin with no entry had no measured
+   always-on context: show it as "not measured", never as 0 or a guess.
+   Tool schemas and skill bodies load on use and are not in this figure; say
+   so. For dollars, run `scripts/cache-cost.py --tokens <saving> --model
+   <model id>` for the user's model and label the result an estimate at list
+   prices. If the ledger exits non-zero, show savings as unavailable and
+   quote its stderr.
 
    ```
    ## Suggested "Lean" Profile
@@ -241,10 +254,12 @@ Manage named profiles that enable/disable specific plugins and rule sets. Switch
    **Will Disable (Tiers 3-4):** <N> plugins  
    - <list with reasons: "zero usage", "duplicate of X", "no skills">
 
-   **Estimated Impact:**
-   - Token reduction: ~12,000 tokens (from 69K to 57K)
-   - Cost savings: ~$0.18 per message (Sonnet)
-   - Health score: 45 → 72
+   **Measured impact** (context ledger, <N> sessions):
+   - Always-on context removed: ~<sum of total_tokens> tokens per session
+     (<plugins without measurements listed as "not measured">)
+   - Steady-state cost removed: ~$<cache-cost result> per message on <model>
+     (list-price estimate)
+   - Health score: re-run `/moltbloat:audit` after applying to see it
 
    **Create and apply this profile?** (yes / save-only / no)
    ```

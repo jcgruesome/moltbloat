@@ -228,6 +228,9 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
      name only; their description could not be verified locally:" then the
      names. Do not call this second group dropped, since there is no local
      source confirming they ever had one.
+   - Top 5 plugins by `plugin_costs[*].total_tokens`: each plugin's
+     measured always-on context per session, split into skill listing,
+     deferred tool names, MCP instructions, and hook output.
    - If `hook_context.unparsed_outputs` > 0: note that some SessionStart
      hooks print non-JSON output, which is not counted as context.
 
