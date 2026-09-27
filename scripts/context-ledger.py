@@ -21,6 +21,7 @@ to sessions whose recorded cwd is PATH or a subdirectory of it. All other
 sources stay global (every sampled interactive session).
 """
 import glob
+import hashlib
 import json
 import os
 import re
@@ -36,6 +37,33 @@ def server_of(tool_name):
     if tool_name.startswith("mcp__"):
         return tool_name[len("mcp__"):].split("__", 1)[0]
     return "(built-in)"
+
+
+def hook_context_text(stdout):
+    """The additionalContext string a SessionStart hook injected, or None."""
+    try:
+        obj = json.loads(stdout) if stdout else None
+    except (TypeError, ValueError):
+        return None
+    hso = obj.get("hookSpecificOutput") if isinstance(obj, dict) else None
+    ctx = hso.get("additionalContext") if isinstance(hso, dict) else None
+    return ctx if isinstance(ctx, str) else None
+
+
+_LINT = None
+
+
+def _emphasis(text):
+    """(emphatic hits, prose lines) using instruction-lint's counting rules."""
+    global _LINT
+    if _LINT is None:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "instruction_lint", os.path.join(os.path.dirname(os.path.abspath(__file__)), "instruction-lint.py"))
+        _LINT = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_LINT)
+    hits, prose = _LINT.emphasis_hits(text)
+    return len(hits), prose
 
 
 def hook_context_len(stdout):
@@ -163,7 +191,12 @@ def extract_session(path):
             if a.get("toolUseID") != hook_batch:
                 continue
             status, n = hook_context_len(a.get("stdout") or "")
-            hooks.append({"command": a.get("command") or "", "status": status, "chars": n})
+            entry = {"command": a.get("command") or "", "status": status, "chars": n}
+            if status == "context":
+                text = hook_context_text(a.get("stdout") or "")
+                entry["text_sha"] = hashlib.sha1(text.encode("utf-8")).hexdigest()
+                entry["emphasis_hits"], entry["prose_lines"] = _emphasis(text)
+            hooks.append(entry)
     if deferred:
         by_server = {}
         for name, line in deferred.items():
@@ -317,7 +350,8 @@ def _median(values):
 
 
 def _session_hook_context(s, hook_owners):
-    """(total_chars, {owner: chars}, no_context_count, unparsed_count) or None if no hook data."""
+    """(total_chars, {owner: chars}, no_context_count, unparsed_count,
+    [per-hook dicts]) or None if no hook data."""
     hooks = s.get("hooks") or []
     if "hook_merged" not in s and not hooks:
         return None
@@ -329,7 +363,31 @@ def _session_hook_context(s, hook_owners):
     total = s["hook_merged"]["chars"] if "hook_merged" in s else sum(by_owner.values())
     no_ctx = sum(1 for h in hooks if h["status"] == "no_context")
     unparsed = sum(1 for h in hooks if h["status"] == "unparsed")
-    return total, by_owner, no_ctx, unparsed
+    per_hook = [dict(h, owner=hook_owners.get(h["command"], "unattributed"))
+                for h in hooks if h["status"] == "context"]
+    return total, by_owner, no_ctx, unparsed, per_hook
+
+
+def _per_hook_summary(rows, tok):
+    """Per SessionStart hook command across sampled sessions (newest first):
+    size, whether its text was identical every session, and emphasis in the
+    newest text. Text itself is not kept, only a hash."""
+    by_cmd = {}
+    for row in rows:
+        for h in row[4]:
+            by_cmd.setdefault(h["command"], []).append(h)
+    out = []
+    for cmd, hs in by_cmd.items():
+        newest = hs[0]
+        m = _median([h["chars"] for h in hs])
+        distinct = len({h["text_sha"] for h in hs})
+        per100 = (newest["emphasis_hits"] * 100.0 / newest["prose_lines"]) if newest["prose_lines"] else 0.0
+        out.append({"command": cmd, "owner": newest["owner"], "samples": len(hs),
+                    "median_chars": m, "median_tokens": tok(m), "distinct_texts": distinct,
+                    "same_every_session": distinct == 1 and len(hs) >= 2,
+                    "emphasis_hits": newest["emphasis_hits"], "prose_lines": newest["prose_lines"],
+                    "emphasis_per_100": round(per100, 1)})
+    return sorted(out, key=lambda x: -x["median_chars"])
 
 
 def build_ledger(files, samples, max_sessions, hook_owners, skill_descs, tokens_per_byte,
@@ -403,7 +461,8 @@ def build_ledger(files, samples, max_sessions, hook_owners, skill_descs, tokens_
         sources["hook_context"] = {"samples": len(rows), "median_chars": m, "median_tokens": tok(m),
                                    "by_owner": median_map([r[1] for r in rows]),
                                    "no_context_outputs": sum(r[2] for r in rows),
-                                   "unparsed_outputs": sum(r[3] for r in rows)}
+                                   "unparsed_outputs": sum(r[3] for r in rows),
+                                   "hooks": _per_hook_summary(rows, tok)}
     if collected["instructions"]:
         per_path = {}
         for session_files in collected["instructions"]:
@@ -452,6 +511,13 @@ def render_markdown(ledger):
         if key in src and src[key][field]:
             lines += ["", f"## {title}", "", "| Name | ~Chars |", "|---|---|"]
             lines += [f"| {k} | {v:,} |" for k, v in _top(src[key][field])]
+    hooks = (src.get("hook_context") or {}).get("hooks") or []
+    if hooks:
+        lines += ["", "## SessionStart hooks", "", "| Owner | Samples | ~Chars | Same every session | Emphasis /100 lines |",
+                  "|---|---|---|---|---|"]
+        for h in hooks:
+            lines.append(f"| {h['owner']} | {h['samples']} | {h['median_chars']:,} | "
+                         f"{'yes' if h['same_every_session'] else 'no'} | {h['emphasis_per_100']} |")
     dropped = (src.get("skill_listing") or {}).get("dropped") or []
     if dropped:
         lines += ["", "## Skills listed without descriptions", "",

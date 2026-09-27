@@ -497,6 +497,20 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
      loaded in the ledger's sampled sessions for this project; say how many
      were sampled).
 
+   **SessionStart hook context** (from the ledger JSON above,
+   `sources.hook_context.hooks`; skip if the ledger was unavailable). These
+   are report-only: hook output belongs to the plugin (or settings file)
+   named in `owner`, so the fix is upstream, a local override, or disabling
+   the plugin.
+   - `repeated_hook_context` (MEDIUM): `same_every_session` is true and
+     `median_chars` is over 1,000. The hook injects identical text at every
+     session start. Suggest showing one-time content once, behind a marker
+     file, as caveman does for its setup nudge.
+   - `hook_emphasis` (LOW, MEDIUM above 2x): `emphasis_per_100` is over
+     `thresholds.instruction_emphasis_per_100_lines`. The same over-triggering
+     risk as emphatic CLAUDE.md wording, in text the user did not write.
+   Report the owner, samples, and size for each.
+
    **Suggested rewrite**: for each file with an `import_residue` or
    within-file `duplicate_section` finding, show the diff from
    `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/instruction-lint.py" --suggest-rewrite <file>`.
