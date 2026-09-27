@@ -465,13 +465,19 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
 
    **Lint the files that load every session**: every file whose `load_mode`
    is `always`, plus `imported` files whose `parent_load_mode` is `always`,
-   with thresholds from config:
+   with thresholds from config. Pass the ledger too (one Bash call, same
+   temp-file pattern) so an over-budget file reports its measured tokens;
+   if the ledger was unavailable above, drop the `--ledger-json` part:
    ```bash
-   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/instruction-lint.py" <paths> --json \
+   project="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+   ledger_json="$(mktemp)"
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/context-ledger.py" --json --project "$project" > "$ledger_json"
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/instruction-lint.py" <paths> --json --ledger-json "$ledger_json" \
      --emphasis-per-100 "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get thresholds.instruction_emphasis_per_100_lines)" \
      --duplicate-similarity "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get thresholds.duplicate_section_similarity)" \
      --drifted-similarity "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get thresholds.drifted_section_similarity)" \
      --byte-budget "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get thresholds.instruction_byte_budget)"
+   rm -f "$ledger_json"
    ```
 
    Findings (severity comes from the script):

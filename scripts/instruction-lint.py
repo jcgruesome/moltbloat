@@ -22,7 +22,10 @@ treated as section breaks.
 Usage:
   python3 instruction-lint.py FILE [FILE ...] [--json]
       [--emphasis-per-100 N] [--duplicate-similarity F]
-      [--drifted-similarity F] [--byte-budget N]
+      [--drifted-similarity F] [--byte-budget N] [--ledger-json FILE]
+
+--ledger-json: a context-ledger.py --json result; the byte-budget finding
+then reports the file's measured tokens per session.
   python3 instruction-lint.py --suggest-rewrite FILE
 """
 import difflib
@@ -213,8 +216,9 @@ def compare_sections(sections, dup_sim, drift_sim):
 def lint_files(paths, emphasis_per_100=DEFAULTS["emphasis_per_100"],
                duplicate_similarity=DEFAULTS["duplicate_similarity"],
                drifted_similarity=DEFAULTS["drifted_similarity"],
-               byte_budget=DEFAULTS["byte_budget"]):
-    findings, sections = [], []
+               byte_budget=DEFAULTS["byte_budget"], measured=None):
+    """`measured`: {realpath: (median_tokens, samples)} from the context ledger."""
+    findings, sections, measured = [], [], measured or {}
     for p in paths:
         if not os.path.isfile(p):
             raise FileNotFoundError(p)
@@ -240,8 +244,15 @@ def lint_files(paths, emphasis_per_100=DEFAULTS["emphasis_per_100"],
         size = len(text.encode("utf-8"))
         if size > byte_budget:
             sev = "MEDIUM" if size > 2 * byte_budget else "LOW"
-            findings.append({"type": "instruction_byte_budget", "severity": sev, "file": p, "line": 1,
-                             "message": f"{size:,} bytes, over the {byte_budget:,}-byte budget. Move detail into files loaded on demand."})
+            finding = {"type": "instruction_byte_budget", "severity": sev, "file": p, "line": 1,
+                       "message": f"{size:,} bytes, over the {byte_budget:,}-byte budget."}
+            m = measured.get(os.path.realpath(p))
+            if m:
+                finding["measured_tokens"], finding["samples"] = m
+                n = f"{m[1]} session" + ("" if m[1] == 1 else "s")
+                finding["message"] += f" Measured ~{m[0]:,} tokens per session (median of {n})."
+            finding["message"] += " Move detail into files loaded on demand."
+            findings.append(finding)
         sections.extend(split_sections(p, text))
     findings.extend(compare_sections(sections, duplicate_similarity, drifted_similarity))
     return {"files_scanned": len(paths), "findings": findings}
@@ -401,12 +412,18 @@ def main(argv):
             "--duplicate-similarity": ("duplicate_similarity", float),
             "--drifted-similarity": ("drifted_similarity", float),
             "--byte-budget": ("byte_budget", int)}
-    kwargs, files, as_json = {}, [], False
+    kwargs, files, as_json, ledger_path = {}, [], False, None
     i = 0
     while i < len(args):
         a = args[i]
         if a == "--json":
             as_json = True
+        elif a == "--ledger-json":
+            i += 1
+            if i >= len(args):
+                sys.stderr.write("error: --ledger-json requires a file\n")
+                return 2
+            ledger_path = args[i]
         elif a in opts:
             i += 1
             if i >= len(args):
@@ -427,6 +444,13 @@ def main(argv):
     if not files:
         sys.stderr.write("error: no files given\n")
         return 2
+    if ledger_path:
+        if not os.path.isfile(ledger_path):
+            sys.stderr.write(f"error: file not found: {ledger_path}\n")
+            return 1
+        with open(ledger_path, encoding="utf-8") as f:
+            inst = ((json.load(f).get("sources") or {}).get("instructions") or {}).get("files") or []
+        kwargs["measured"] = {os.path.realpath(x["path"]): (x["median_tokens"], x["samples"]) for x in inst}
     try:
         result = lint_files(files, **kwargs)
     except FileNotFoundError as e:
