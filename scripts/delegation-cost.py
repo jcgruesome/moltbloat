@@ -53,7 +53,9 @@ READ_ONLY_TOOLS = {"Read", "Grep", "Glob", "LS", "NotebookRead", "WebFetch", "We
                    "SubagentHandback"}
 READ_ONLY_BASH = {"ls", "cat", "head", "tail", "grep", "rg", "find", "wc", "file", "stat", "du", "tree", "pwd",
                   "echo", "printf", "true", "which", "date"}
-READ_ONLY_GIT = {"log", "diff", "show", "status", "blame", "rev-parse", "branch"}
+READ_ONLY_GIT = {"log", "diff", "show", "status", "blame", "rev-parse"}
+GIT_BRANCH_LIST_FLAGS = {"-a", "-r", "-v", "-vv", "--list", "--all", "--remotes", "--show-current"}
+FIND_WRITE_FLAGS = {"-delete", "-exec", "-execdir", "-ok", "-okdir", "-fprint", "-fprint0", "-fprintf", "-fls"}
 USAGE_FIELDS = ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens",
                 "output_tokens", "ephemeral_5m_input_tokens", "ephemeral_1h_input_tokens")
 
@@ -70,13 +72,19 @@ def load_rates():
     return rates
 
 
+DATE_SUFFIX_RE = re.compile(r"-\d{8}$")
+
+
 def rates_for(model, rates):
-    """Rate entry for the longest matching model-id prefix, or None."""
-    best = None
-    for prefix in rates:
-        if model and model.startswith(prefix) and (best is None or len(prefix) > len(best)):
-            best = prefix
-    return rates[best] if best else None
+    """Rate entry for `model`: an exact id, or an id plus a -YYYYMMDD date
+    suffix. A newer model sharing a prefix (claude-opus-5-7 vs claude-opus-5)
+    gets no rate rather than a guessed one."""
+    if not model:
+        return None
+    if model in rates:
+        return rates[model]
+    base = DATE_SUFFIX_RE.sub("", model)
+    return rates.get(base)
 
 
 def family(model):
@@ -110,27 +118,52 @@ def _flat_usage(usage):
 HARMLESS_REDIRECT_RE = re.compile(r"\s*(2>/dev/null|2>&1|>/dev/null)")
 
 
+def _git_read_only(words):
+    """words after `git`; skips -C <dir> and -c <k=v> global options."""
+    i = 0
+    while i < len(words) and words[i] in ("-C", "-c"):
+        i += 2
+    if i >= len(words):
+        return False
+    sub, rest = words[i], words[i + 1:]
+    if any(w.startswith("--output") for w in rest):
+        return False
+    if sub == "branch":
+        return all(w in GIT_BRANCH_LIST_FLAGS for w in rest)
+    return sub in READ_ONLY_GIT
+
+
 def _bash_read_only(cmd):
-    """True if every segment of a pipeline / && / ; chain is a read-only
-    command. Any remaining redirect or command substitution fails it."""
-    cmd = HARMLESS_REDIRECT_RE.sub("", cmd or "")
+    """True if every segment of a command chain is a read-only command.
+
+    Segments split on newlines, ;, &&, ||, |, and a lone &. Redirects,
+    command substitution, and heredocs fail it; so do write-capable flags
+    on otherwise read-only tools (find -delete/-exec, sed -i or a w
+    command, git branch with a name, git diff --output).
+    """
+    raw = cmd or ""
+    if re.search(r"\bsed\b[^\n;|&]*['\"](?:[^'\"]*[\s;{])?w\s", raw):
+        return False  # sed script with a w (write file) command
+    cmd = HARMLESS_REDIRECT_RE.sub("", raw)
     # Quoted arguments (e.g. grep -E "a|b") must not be split as pipes.
     cmd = re.sub(r"'[^']*'|\"(?:[^\"\\]|\\.)*\"", "ARG", cmd)
-    if not cmd.strip() or any(tok in cmd for tok in (">", "$(", "`")):
+    if not cmd.strip() or any(tok in cmd for tok in (">", "$(", "`", "<<")):
         return False
-    for seg in re.split(r"\|\||&&|;|\|", cmd):
+    for seg in re.split(r"\n|\|\||&&|;|\||&", cmd):
         words = seg.strip().split()
-        if not words:
+        if not words or words[0] == "cd":
             continue
-        if words[0] == "cd":
-            continue
-        if words[0] == "git":
-            if not (len(words) > 1 and words[1] in READ_ONLY_GIT):
+        head = words[0]
+        if head == "git":
+            if not _git_read_only(words[1:]):
                 return False
-        elif words[0] == "sed":
-            if "-n" not in words or "-i" in words:
+        elif head == "sed":
+            if "-n" not in words or any(w.startswith("-i") for w in words):
                 return False
-        elif words[0] not in READ_ONLY_BASH:
+        elif head == "find":
+            if any(w in FIND_WRITE_FLAGS for w in words):
+                return False
+        elif head not in READ_ONLY_BASH:
             return False
     return True
 
@@ -138,7 +171,7 @@ def _bash_read_only(cmd):
 def parse_run(path):
     """One subagent run: deduped per-model usage, tools, first/last message."""
     messages = {}  # message id -> {model, usage, order}
-    tools, last_text, first_ts = [], "", None
+    tools, last_text, first_ts, handback = [], "", None, None
     order = 0
     with open(path, "r", encoding="utf-8", errors="replace") as fh:
         for line in fh:
@@ -166,11 +199,17 @@ def parse_run(path):
                 if not isinstance(block, dict):
                     continue
                 if block.get("type") == "tool_use":
-                    tools.append((block.get("name"), (block.get("input") or {}).get("command")))
+                    inp = block.get("input") or {}
+                    tools.append((block.get("name"), inp.get("command")))
+                    # A subagent's reply is the SubagentHandback message when
+                    # it ends with one, not its last text block.
+                    handback = inp.get("message") if block.get("name") == "SubagentHandback" else None
                 elif block.get("type") == "text" and block.get("text"):
                     last_text = block["text"]
+                    handback = None
     return {"messages": sorted(messages.values(), key=lambda m: m["order"]),
-            "tools": tools, "last_text": last_text, "first_ts": first_ts}
+            "tools": tools, "last_text": handback if handback is not None else last_text,
+            "first_ts": first_ts}
 
 
 def read_only_run(tools):
@@ -197,11 +236,15 @@ def load_meta(path):
 
 
 def find_runs(projects_dir, project=None):
-    pattern = os.path.join(projects_dir, "*", "*", "subagents", "agent-*.jsonl")
-    runs = glob.glob(pattern)
+    """Subagent transcripts, including workflow runs nested under
+    subagents/workflows/wf_*/. With `project`, only that project's dir."""
+    pattern = os.path.join(projects_dir, "*", "*", "subagents", "**", "agent-*.jsonl")
+    runs = glob.glob(pattern, recursive=True)
     if project:
         enc = re.sub(r"[^A-Za-z0-9]", "-", os.path.realpath(project))
-        runs = [r for r in runs if os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(r)))).startswith(enc)]
+        base = os.path.realpath(projects_dir)
+        runs = [r for r in runs
+                if os.path.relpath(os.path.realpath(r), base).split(os.sep)[0] == enc]
     return runs
 
 
@@ -215,22 +258,61 @@ def _parse_frontmatter(text):
     for line in text[3:end].splitlines():
         if ":" in line and not line.startswith((" ", "\t")):
             k, v = line.split(":", 1)
+            v = re.sub(r"\s+#.*$", "", v.strip())
             out[k.strip()] = v.strip().strip("'\"")
     return out
 
 
+def _enabled_plugins(config_dir, project):
+    """enabledPlugins from user settings, overridden by project settings."""
+    enabled = {}
+    paths = [os.path.join(config_dir, "settings.json")]
+    if project:
+        paths += [os.path.join(project, ".claude", "settings.json"),
+                  os.path.join(project, ".claude", "settings.local.json")]
+    for p in paths:
+        if os.path.isfile(p):
+            with open(p, encoding="utf-8") as f:
+                enabled.update(json.load(f).get("enabledPlugins") or {})
+    return enabled
+
+
+def _active_install(entries, project):
+    """The manifest entry that applies here: a project-scoped install for
+    this project wins, else the user-scoped one. Other projects' installs
+    are ignored."""
+    proj = os.path.realpath(project) if project else None
+    user = None
+    for e in entries or []:
+        if not (e or {}).get("installPath"):
+            continue
+        if e.get("scope") == "project":
+            if proj and e.get("projectPath") and os.path.realpath(e["projectPath"]) == proj:
+                return e
+        else:
+            user = user or e
+    return user
+
+
 def agent_inventory(config_dir, project=None):
-    """Agent definitions: {name: {source, path, model}} (model None = inherits)."""
+    """Agent definitions: {name: {source, path, model}} (model None = inherits).
+
+    Plugin agents come only from enabled plugins, at the install that applies
+    to `project`, keyed `plugin:name`.
+    """
     dirs = [("user", os.path.join(config_dir, "agents"))]
     if project:
         dirs.append(("project", os.path.join(project, ".claude", "agents")))
     manifest = os.path.join(config_dir, "plugins", "installed_plugins.json")
     if os.path.isfile(manifest):
+        enabled = _enabled_plugins(config_dir, project)
         with open(manifest, encoding="utf-8") as f:
             for key, entries in (json.load(f).get("plugins") or {}).items():
-                for entry in entries or []:
-                    if (entry or {}).get("installPath"):
-                        dirs.append((f"plugin:{key.split('@', 1)[0]}", os.path.join(entry["installPath"], "agents")))
+                if enabled.get(key) is not True:
+                    continue
+                entry = _active_install(entries, project)
+                if entry:
+                    dirs.append((f"plugin:{key.split('@', 1)[0]}", os.path.join(entry["installPath"], "agents")))
     inv = {}
     for source, d in dirs:
         for p in sorted(glob.glob(os.path.join(d, "*.md"))):
@@ -254,12 +336,12 @@ def analyze(runs, rates, since_days=None, now=None):
         run = parse_run(path)
         if not run["messages"]:
             continue
-        if cutoff and run["first_ts"]:
+        if cutoff:
             try:
-                ts = datetime.fromisoformat(run["first_ts"].replace("Z", "+00:00"))
+                ts = datetime.fromisoformat((run["first_ts"] or "").replace("Z", "+00:00"))
             except ValueError:
-                ts = None
-            if ts and ts < cutoff:
+                ts = datetime.fromtimestamp(os.path.getmtime(path), timezone.utc)
+            if ts < cutoff:
                 continue
         scanned += 1
         meta, err = load_meta(path)
@@ -296,7 +378,8 @@ def analyze(runs, rates, since_days=None, now=None):
         if rate:
             spin = dict(first["usage"], output_tokens=0)
             spinups.setdefault(agent_type, []).append(price(spin, rate))
-        if fam in PREMIUM_FAMILIES and priced_all and read_only_run(run["tools"]) and len(run["last_text"]) <= SHORT_REPLY_CHARS:
+        is_fork = agent_type == "fork" or meta.get("isFork")
+        if not is_fork and fam in PREMIUM_FAMILIES and priced_all and read_only_run(run["tools"]) and len(run["last_text"]) <= SHORT_REPLY_CHARS:
             alt_model = SUGGESTED_MODEL[fam]
             alt_rate = rates_for(alt_model, rates)
             alt_cost = sum(price(m["usage"], alt_rate) for m in run["messages"])
@@ -323,8 +406,9 @@ def unpinned_findings(result, inventory):
     for name, a in inventory.items():
         if a["model"]:
             continue
-        bare = name.split(":")[-1]
-        key = name if name in spend else bare
+        # Spend is keyed by the agentType a run recorded: bare names for user
+        # and project agents, plugin:name for plugin agents. No cross-matching.
+        key = name
         cost = spend.get(key, 0.0)
         models = ", ".join(f"{m} x{n}" for m, n in sorted(mix.get(key, []), key=lambda x: -x[1]))
         out.append({"type": "unpinned_agent", "agent": name, "path": a["path"], "spend": cost,
@@ -336,31 +420,55 @@ def unpinned_findings(result, inventory):
 
 
 TIER_RE = re.compile(r"\b(haiku|sonnet|opus|fable)\b", re.IGNORECASE)
+NEGATION_RE = re.compile(r"\b(never|not|don't|dont|avoid|no)\b", re.IGNORECASE)
+FENCE_LINE_RE = re.compile(r"^\s*(```|~~~)")
+
+
+def _names_agent(line, name):
+    """The agent is named in backticks, or next to the word agent/subagent,
+    so common words like "explore" in prose do not count."""
+    e = re.escape(name)
+    return bool(re.search(r"`" + e + r"`", line)
+                or re.search(r"(?<![\w-])" + e + r"(?![\w-])\s+(sub)?agent\b", line, re.IGNORECASE)
+                or re.search(r"\b(sub)?agent\s+`?" + e + r"(?![\w-])", line, re.IGNORECASE))
 
 
 def prose_conflicts(instruction_paths, inventory):
-    """Lines naming an agent and a model tier that disagree with its pin."""
+    """Lines naming an agent and one model tier that its pin contradicts.
+
+    Skips fenced code, negated lines, and lines naming several tiers (a
+    routing table is ambiguous line by line). LOW until precision is shown.
+    """
     out = []
     for p in instruction_paths:
         with open(p, encoding="utf-8", errors="replace") as f:
             lines = f.read().splitlines()
+        fence = None
         for n, line in enumerate(lines, 1):
+            m = FENCE_LINE_RE.match(line)
+            if m:
+                fence = None if fence == m.group(1) else (fence or m.group(1))
+                continue
+            if fence or NEGATION_RE.search(line):
+                continue
             tiers = {t.lower() for t in TIER_RE.findall(line)}
             if len(tiers) != 1:
-                continue  # zero tiers, or several (a routing table) is ambiguous
+                continue
             tier = tiers.pop()
             for name, a in inventory.items():
-                bare = name.split(":")[-1]
-                if not re.search(r"(?<![\w-])" + re.escape(bare) + r"(?![\w-])", line):
+                if not _names_agent(line, name):
                     continue
                 pinned = (a["model"] or "").lower()
                 if tier in pinned:
                     continue
-                out.append({"type": "delegation_prose_conflict", "severity": "MEDIUM", "file": p, "line": n,
+                if a["model"]:
+                    detail = f"but its definition pins `model: {a['model']}`"
+                else:
+                    detail = "but it is unpinned, so it runs on whatever model the caller or session picks"
+                out.append({"type": "delegation_prose_conflict", "severity": "LOW", "file": p, "line": n,
                             "agent": name,
-                            "message": (f"Line names `{bare}` with {tier}, but its definition "
-                                        + (f"pins `model: {a['model']}`." if a["model"] else "has no model pin (inherits the session model).")
-                                        + f" Prose does not change the model; set `model:` in {a['path']}.")})
+                            "message": (f"Line asks for `{name}` on {tier}, {detail}. Prose does not change "
+                                        f"the model; set `model:` in {a['path']}.")})
     return out
 
 

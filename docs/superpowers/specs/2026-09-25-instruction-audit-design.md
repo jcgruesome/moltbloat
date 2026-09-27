@@ -218,6 +218,12 @@ are skipped. Prices come from a per-model table added to config
 because Opus 5.5 ($4/$20, cache reads $0.20) and Fable 5.1 (cache reads
 $0.25) do not fit the flat input rate and 0.1x cache-read multiplier used
 elsewhere; a model with no rate is reported as unpriced.
+Spin-up cost is the whole input side of a run's first message (fresh input,
+cache writes, and cache reads), not only its cache write, since a cache hit
+on a shared prefix is also part of the price of starting a subagent. Runs
+nested under `subagents/workflows/` count (about a third of spend on the
+author's machine); forks are never savings candidates because they inherit
+the parent's model and cache.
 
 
 Subagent runs live in `<session>/subagents/agent-<id>.jsonl` with a sibling

@@ -293,8 +293,8 @@ Show what's actually being used versus what's just sitting there consuming conte
      and say the re-priced figure assumes the same token counts. If the list
      is empty, say so; do not invent a saving.
    - `unpinned_agents` with spend: the agent, its spend, and its model mix.
-     The fix is a `model:` line in the agent's frontmatter (applied by
-     `/moltbloat:clean` with confirmation), never a prose rule.
+     The fix is a `model:` line in the agent's frontmatter, which the user
+     edits; a prose rule in CLAUDE.md does not change the model.
    - `unpriced_models`: name any model with no rate in `costs.models`.
    Non-zero exit: say delegation cost is unavailable and quote stderr.
 

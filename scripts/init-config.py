@@ -118,6 +118,16 @@ def _refresh_superseded_defaults(config):
             config[section][key] = DEFAULT_CONFIG[section][key]
 
 
+def _merge_rate_table(config, user_config):
+    """Merge `costs.models` per model id: defaults first, the user's entries
+    on top. A one-level merge would let one custom model wipe every default
+    rate, and freeze the table so later default rates never arrive."""
+    user_models = ((user_config or {}).get("costs") or {}).get("models") or {}
+    config["costs"] = dict(config.get("costs") or {})
+    config["costs"]["models"] = {**DEFAULT_CONFIG["costs"]["models"], **user_models}
+    return config
+
+
 def migrate_config(old_config):
     """Migrate old config to current schema."""
     # A shallow .copy() would leave nested dicts (costs, thresholds, ...)
@@ -135,6 +145,7 @@ def migrate_config(old_config):
             config[key] = value
 
     _refresh_superseded_defaults(config)
+    _merge_rate_table(config, old_config)
 
     # Update version and migration timestamp
     config["version"] = CONFIG_VERSION
@@ -173,7 +184,7 @@ def init_config():
                 else:
                     config[key] = value
             
-            return config
+            return _merge_rate_table(config, user_config)
             
         except (json.JSONDecodeError, IOError) as e:
             print(f"Error loading config: {e}, using defaults", file=sys.stderr)
@@ -215,7 +226,7 @@ def load_config():
             config[key] = {**config[key], **value}
         else:
             config[key] = value
-    return config
+    return _merge_rate_table(config, user_config)
 
 
 def get_value(key_path, default=None):

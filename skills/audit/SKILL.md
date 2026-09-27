@@ -514,9 +514,10 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
      definition with no `model:` (or `model: inherit`), so its model is
      whatever each caller or the session picks. Show spend and model mix.
      Fix: add `model:` to the agent's frontmatter.
-   - `prose_conflicts` (MEDIUM): an instruction line that names an agent and
-     one model tier its pin contradicts (or it has no pin). Prose does not
-     change which model an agent runs on; the frontmatter does.
+   - `prose_conflicts` (LOW): an instruction line that names an agent (in
+     backticks, or next to "agent"/"subagent") and one model tier that its
+     pin contradicts, or that it is unpinned. Prose does not change which
+     model an agent runs on; the frontmatter does.
    Non-zero exit: skip this check and say why (quote stderr).
 
 4. **Classify findings**
