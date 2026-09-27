@@ -52,6 +52,21 @@ def run():
     print("Test: monthly cost is daily cost times 30")
     _assert(round(r["monthly_cost"], 2) == round(r["daily_cost"] * 30, 2), "monthly = daily_cost * 30")
 
+    print("Test: --model reads per-model input and cache-read rates from config")
+    import contextlib
+    import io
+    import json as _json
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        code = cc.main(["x", "--tokens", "1000000", "--model", "claude-opus-5-5", "--json"])
+    d = _json.loads(out.getvalue())
+    _assert(code == 0 and d["rate_per_1m"] == 4.0, "opus 5.5 input rate")
+    _assert(abs(d["cache_read_multiplier"] - 0.05) < 1e-9, "opus 5.5 cache read is 0.05x, not 0.1x")
+    with contextlib.redirect_stderr(io.StringIO()):
+        _assert(cc.main(["x", "--tokens", "1", "--model", "claude-opus-9"]) == 2, "unknown model -> 2")
+        _assert(cc.main(["x", "--tokens", "1", "--model", "claude-opus-5-5", "--rate", "3"]) == 2, "--model with --rate -> 2")
+        _assert(cc.main(["x", "--tokens", "1", "--rate", "3"]) == 2, "missing multipliers -> 2")
+
     print("\n✓ All cache-cost tests passed")
 
 

@@ -82,7 +82,7 @@ Token-budget shows the actual dollar cost of your ecosystem overhead:
 - Per day (assuming 200 messages)
 - Per month
 - Caching-aware: shows both the turn-1 uncached ceiling and the realistic turn-2+ steady-state price once static ecosystem content (CLAUDE.md, rules, skill listings, MCP tool defs) is prompt-cached — pricing every message at full rate overstates real cost 5-10x past one turn
-- Context-window percentage is computed against the model's actual window (Haiku 4.5's 200K vs. 1M for Opus 5/Sonnet 5/Fable 5.1), not a flat 1M
+- Context-window percentage is computed against the model's actual window (Haiku 4.5's 200K vs. 1M for Opus 5.5/Sonnet 5/Fable 5.1), not a flat 1M
 
 ### Honest numbers
 Every number moltbloat reports is one of three kinds, and the report says which:

@@ -39,12 +39,12 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
    ```
 
    Use these values for calculations:
-   - Cost rates: fable_per_1m_tokens, opus_per_1m_tokens, sonnet_per_1m_tokens, haiku_per_1m_tokens
-   - Context window: `costs.context_windows` is a per-model map (fable_5_1, opus_5, sonnet_5: 1,000,000; haiku_4_5: 200,000). `costs.context_window_tokens` (default: 1,000,000) is the flat fallback shared by Opus 5, Sonnet 5, and Fable 5.1.
+   - Cost rates: `costs.models`, a per-model table (input, output, cache read per 1M tokens). The cost step below reads it through `cache-cost.py --model`.
+   - Context window: `costs.context_windows` is a per-model map (fable_5_1, opus_5_5, sonnet_5: 1,000,000; haiku_4_5: 200,000). `costs.context_window_tokens` (default: 1,000,000) is the flat fallback shared by Opus 5.5, Sonnet 5, and Fable 5.1.
    - Token estimates: tokens_per_byte (default: 0.25), tokens_per_skill, tokens_per_mcp_tool, tokens_per_agent
    - Daily messages: messages_per_day (default: 200)
 
-   **Which model's window to use**: if the user has stated which model they're on this session, use that model's entry from `context_windows`. Otherwise ask, or default to the shared 1,000,000-token window (Opus 5 / Sonnet 5 / Fable 5.1) unless the user has named Haiku, since Haiku 4.5 is the one model with a materially different (200,000-token) window. Never divide by 1,000,000 for a Haiku 4.5 user: it silently understates their real percentage by 5x.
+   **Which model's window to use**: if the user has stated which model they're on this session, use that model's entry from `context_windows`. Otherwise ask, or default to the shared 1,000,000-token window (Opus 5.5 / Sonnet 5 / Fable 5.1) unless the user has named Haiku, since Haiku 4.5 is the one model with a materially different (200,000-token) window. Never divide by 1,000,000 for a Haiku 4.5 user: it silently understates their real percentage by 5x.
 
 3. **Measure each context source**
 
@@ -164,14 +164,14 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
 
 4. **Build the budget table**
 
-   Calculate totals and percentages against the active model's actual context window from `costs.context_windows` (Opus 5, Sonnet 5, and Fable 5.1 are all 1,000,000 tokens; Haiku 4.5 is 200,000 — a fixed byte total is 5x more of Haiku's window than of the others', so getting this denominator right matters). Every "% of window" figure below must use this same window size, not a hardcoded 1M.
+   Calculate totals and percentages against the active model's actual context window from `costs.context_windows` (Opus 5.5, Sonnet 5, and Fable 5.1 are all 1,000,000 tokens; Haiku 4.5 is 200,000; a fixed byte total is 5x more of Haiku's window than of the others', so getting this denominator right matters). Every "% of window" figure below must use this same window size, not a hardcoded 1M.
 
    Output in this format:
 
    ```
    # Moltbloat Token Budget
 
-   **Model**: <model in use, or "Opus 5 / Sonnet 5 / Fable 5.1 (assumed)" if unstated>
+   **Model**: <model in use, or "Opus 5.5 / Sonnet 5 / Fable 5.1 (assumed)" if unstated>
    **Context window**: <window for that model, e.g. 1,000,000 tokens, or 200,000 tokens for Haiku 4.5>
    **Total ecosystem cost**: ~X tokens (Y% of window)
 
@@ -238,30 +238,33 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
    skill listings, MCP tool defs) is static within a session, exactly what
    prompt caching targets: turn 1 pays the cache-write rate (~1.25x base,
    writing the content to cache), every later turn in that session reads the
-   cache instead at ~0.1x base (~90% cheaper). Pricing every message at full
+   cache instead at that model's cache-read rate (0.1x input on most models,
+   0.05x on Opus 5.5, 0.025x on Fable 5.1). Pricing every message at full
    rate, as this skill used to, overstates steady-state cost 5-10x for any
    session past one turn. Pure API-level prompt-caching economics on input
    tokens, unrelated to Claude Code's own context-window auto-compaction.
 
-   Rates (from `costs` in step 2): Fable 5.1 $10.00, Opus 5 $5.00, Sonnet 5
-   $2.00, Haiku 4.5 $1.00 (per 1M input tokens). Also from `costs`:
-   `cache_write_multiplier` (default 1.25), `cache_read_multiplier`
-   (default 0.1).
+   Rates come from `costs.models` (per 1M input tokens: Fable 5.1 $10.00,
+   Opus 5.5 $4.00, Sonnet 5 $2.00, Haiku 4.5 $1.00, each with its own
+   cache-read rate) and `costs.cache_write_multiplier` (default 1.25).
 
-   Run once per model with `scripts/cache-cost.py` (computes the uncached
-   ceiling, turn-1 write cost, turn-2+ read cost, a session-blended average,
-   and daily/monthly cost) rather than doing the arithmetic in prose:
+   Run once per model with `scripts/cache-cost.py --model` (computes the
+   uncached ceiling, turn-1 write cost, turn-2+ read cost, a session-blended
+   average, and daily/monthly cost) rather than doing the arithmetic in
+   prose. Model ids: `claude-fable-5-1`, `claude-opus-5-5`, `claude-sonnet-5`,
+   `claude-haiku-4-5`:
    ```bash
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/cache-cost.py" \
-     --tokens <total_tokens> --rate <model_rate_per_1m> \
-     --write-mult <cache_write_multiplier> --read-mult <cache_read_multiplier> \
-     --messages-per-day 200 --json
+     --tokens <total_tokens> --model <model id> \
+     --messages-per-day <messages_per_day> --json
    ```
+   Exit 2 means that model has no rate in `costs.models`; show its row as
+   "no rate configured" rather than a number.
 
    | Model | Turn 1 (uncached ceiling) | Turn 2+ (cache read, steady state) | Per Day (200 msgs) | Per Month |
    |-------|---------------------------|-------------------------------------|---------------------|-----------|
    | Fable 5.1 | $<uncached_cost> | $<cached_turn_cost> | $<daily_cost> | $<monthly_cost> |
-   | Opus 5 | $<uncached_cost> | $<cached_turn_cost> | $<daily_cost> | $<monthly_cost> |
+   | Opus 5.5 | $<uncached_cost> | $<cached_turn_cost> | $<daily_cost> | $<monthly_cost> |
    | Sonnet 5 | $<uncached_cost> | $<cached_turn_cost> | $<daily_cost> | $<monthly_cost> |
    | Haiku 4.5 | $<uncached_cost> | $<cached_turn_cost> | $<daily_cost> | $<monthly_cost> |
 
@@ -278,7 +281,7 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
 
    ## Context Pressure
 
-   Calculate what percentage of the context window is consumed by ecosystem overhead alone (before any user messages, tool results, or conversation history). Divide by the active model's actual window from `costs.context_windows`, not a flat 1M — for a Haiku 4.5 user this denominator is 200,000, so the same overhead reads as a 5x larger percentage than it would for Opus 5/Sonnet 5/Fable 5.1:
+   Calculate what percentage of the context window is consumed by ecosystem overhead alone (before any user messages, tool results, or conversation history). Divide by the active model's actual window from `costs.context_windows`, not a flat 1M. For a Haiku 4.5 user this denominator is 200,000, so the same overhead reads as a 5x larger percentage than it would for Opus 5.5/Sonnet 5/Fable 5.1:
 
    ```
    Ecosystem overhead: ~<X> tokens (<Y>% of <window size> context window)

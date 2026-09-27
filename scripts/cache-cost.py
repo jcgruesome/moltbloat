@@ -12,10 +12,18 @@ tokens; unrelated to context-window auto-compaction.
 
 Usage: python3 cache-cost.py --tokens N --rate R --write-mult M --read-mult M
                               [--messages-per-day N] [--session-messages N] [--json]
+       python3 cache-cost.py --tokens N --model MODEL_ID [--write-mult M] [...]
+
+--model reads the input rate and that model's own cache-read rate from
+`costs.models` in moltbloat config (cache reads are not 0.1x on every
+model: Opus 5.5 is 0.05x, Fable 5.1 0.025x). --write-mult defaults to
+`costs.cache_write_multiplier`.
 Output: markdown, or one JSON object with --json. Fails fast on total_tokens <= 0.
 """
 import argparse
+import importlib.util
 import json
+import os
 import sys
 
 DEFAULT_MESSAGES_PER_DAY = 200
@@ -83,13 +91,36 @@ def render_markdown(r):
 def main(argv):
     p = argparse.ArgumentParser()
     p.add_argument("--tokens", type=int, required=True)
-    p.add_argument("--rate", type=float, required=True)
-    p.add_argument("--write-mult", type=float, required=True)
-    p.add_argument("--read-mult", type=float, required=True)
+    p.add_argument("--model")
+    p.add_argument("--rate", type=float)
+    p.add_argument("--write-mult", type=float)
+    p.add_argument("--read-mult", type=float)
     p.add_argument("--messages-per-day", type=int, default=DEFAULT_MESSAGES_PER_DAY)
     p.add_argument("--session-messages", type=int, default=DEFAULT_SESSION_MESSAGES)
     p.add_argument("--json", action="store_true")
     args = p.parse_args(argv[1:])
+
+    if args.model:
+        spec = importlib.util.spec_from_file_location(
+            "init_config", os.path.join(os.path.dirname(os.path.abspath(__file__)), "init-config.py"))
+        ic = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(ic)
+        config = ic.load_config()
+        rates = ic.model_rates(args.model, config)
+        if rates is None:
+            sys.stderr.write(f"error: no rate for model {args.model} in costs.models\n")
+            return 2
+        if args.rate is not None or args.read_mult is not None:
+            sys.stderr.write("error: --model sets the rate and read multiplier; do not pass --rate or --read-mult\n")
+            return 2
+        args.rate = rates[0]
+        args.read_mult = rates[1] / rates[0]
+        if args.write_mult is None:
+            args.write_mult = config["costs"]["cache_write_multiplier"]
+    missing = [n for n in ("rate", "write_mult", "read_mult") if getattr(args, n) is None]
+    if missing:
+        sys.stderr.write("error: pass --model, or all of --rate --write-mult --read-mult\n")
+        return 2
 
     try:
         result = scan(
