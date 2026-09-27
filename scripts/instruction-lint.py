@@ -64,6 +64,25 @@ def _read(path):
         return f.read()
 
 
+def split_lines(text):
+    """Lines split on "\n" only, without the empty tail after a final newline.
+
+    str.splitlines() also splits on form feed, U+2028 and friends, which
+    would renumber lines against editors and let a rewrite turn those
+    characters into real newlines.
+    """
+    if not text:
+        return []
+    lines = text.split("\n")
+    if text.endswith("\n"):
+        lines.pop()
+    return lines
+
+
+def _keepends(text):
+    return re.findall(r"[^\n]*\n|[^\n]+$", text)
+
+
 def prose_mask(lines):
     """Per line: True if it is prose (not inside a fence, not a fence line, not a blockquote)."""
     mask, fence = [], None
@@ -84,7 +103,7 @@ def _prose_text(line):
 
 
 def emphasis_hits(text):
-    lines = text.splitlines()
+    lines = split_lines(text)
     mask = prose_mask(lines)
     hits, prose_lines = [], 0
     for n, (line, is_prose) in enumerate(zip(lines, mask), 1):
@@ -101,7 +120,7 @@ def emphasis_hits(text):
 
 
 def placeholder_hits(text):
-    lines = text.splitlines()
+    lines = split_lines(text)
     out = []
     for n, (line, is_prose) in enumerate(zip(lines, prose_mask(lines)), 1):
         if not is_prose:
@@ -120,7 +139,7 @@ def split_sections(path, text):
     Each: {file, heading, line, body_lines}. Text before the first header is
     a section with heading "".
     """
-    lines = text.splitlines()
+    lines = split_lines(text)
     mask = prose_mask(lines)
     sections = [{"file": path, "heading": "", "line": 1, "body_lines": []}]
     for n, (line, is_prose) in enumerate(zip(lines, mask), 1):
@@ -177,7 +196,8 @@ def compare_sections(sections, dup_sim, drift_sim):
                 findings.append({"type": "duplicate_section", "severity": "MEDIUM",
                                  "file": b["file"], "line": b["line"],
                                  "message": f"Section '{b['heading'] or '(preamble)'}' duplicates {a['file']}:{a['line']} ({ratio:.0%} similar). Keep one copy.",
-                                 "pair": [f"{a['file']}:{a['line']}", f"{b['file']}:{b['line']}"]})
+                                 "pair": [f"{a['file']}:{a['line']}", f"{b['file']}:{b['line']}"],
+                                 "headings": [a["heading"], b["heading"]]})
             elif ratio >= drift_sim or same_heading:
                 diff = [l for l in difflib.unified_diff(a["body_lines"], b["body_lines"], lineterm="", n=0)
                         if l[:1] in "+-" and not l.startswith(("+++", "---"))]
@@ -185,6 +205,7 @@ def compare_sections(sections, dup_sim, drift_sim):
                                  "file": b["file"], "line": b["line"],
                                  "message": f"Two diverged versions of '{b['heading'] or '(preamble)'}' at {loc} ({ratio:.0%} similar). Claude sees both and may follow either; pick one.",
                                  "pair": [f"{a['file']}:{a['line']}", f"{b['file']}:{b['line']}"],
+                                 "headings": [a["heading"], b["heading"]],
                                  "differences": diff[:12]})
     return findings
 
@@ -212,7 +233,7 @@ def lint_files(paths, emphasis_per_100=DEFAULTS["emphasis_per_100"],
         for n, word in placeholder_hits(text):
             findings.append({"type": "placeholder_marker", "severity": "LOW", "file": p, "line": n,
                              "message": f"`{word}` in instruction prose: unfinished text that loads every session."})
-        for n, line in enumerate(text.splitlines(), 1):
+        for n, line in enumerate(split_lines(text), 1):
             if IMPORT_MARKER_RE.match(line):
                 findings.append({"type": "import_residue", "severity": "LOW", "file": p, "line": n,
                                  "message": "`claude import` marker comment; check the imported block is not a duplicate of existing instructions."})
@@ -240,7 +261,7 @@ def preserved_items(text):
     """Items a rewrite must keep at least one copy of: fenced blocks, inline
     code, URLs, @imports, and file paths."""
     items, block, fence = set(), [], None
-    for line in text.splitlines():
+    for line in split_lines(text):
         m = FENCE_RE.match(line)
         if m and (fence is None or m.group(1) == fence):
             if fence is not None:
@@ -291,7 +312,7 @@ def rewrite(text):
     (its body plus every child section), with at least MIN_SAME_HEADING_LINES
     non-blank body lines. Everything else is left byte-for-byte.
     """
-    lines = text.splitlines()
+    lines = split_lines(text)
     mask = prose_mask(lines)
     drop = set(n for n, (line, p) in enumerate(zip(lines, mask)) if p and IMPORT_MARKER_RE.match(line))
     seen = set()
@@ -317,7 +338,7 @@ def rewrite(text):
 def _unified_diff(path, old, new):
     """Unified diff that `patch` accepts, including files without a final newline."""
     out = []
-    for line in difflib.unified_diff(old.splitlines(True), new.splitlines(True),
+    for line in difflib.unified_diff(_keepends(old), _keepends(new),
                                      fromfile=path, tofile=path + " (suggested)"):
         if line.endswith("\n"):
             out.append(line)

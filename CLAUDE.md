@@ -39,6 +39,7 @@ Run `/moltbloat:help` for the full command reference.
 - `~/.claude/projects/**/*.jsonl` — Claude Code's native session transcripts. Read-only by moltbloat; the **primary** usage source mined by `scripts/parse-history.py` for `/moltbloat:usage`.
 - `~/.moltbloat/usage.jsonl` — Usage tracking data (created automatically by PostToolUse hook; supplements native history)
 - `~/.moltbloat/usage.jsonl.bak` — Backup created before usage compaction
+- `~/.moltbloat/backups/<UTC time>/`: copies of instruction files and agent definitions taken by `/moltbloat:clean` before it changes them (mirrors each file's absolute path)
 - `~/.moltbloat/baseline.json` — Ecosystem snapshot (created by `/moltbloat:snapshot`)
 - `~/.moltbloat/history.log` — One-line snapshot summaries over time (appended by `/moltbloat:snapshot`)
 - `~/.moltbloat/profiles/*.json` — Saved profiles (created by `/moltbloat:profile`)
