@@ -25,7 +25,7 @@ def _assert(cond, msg):
 
 def run():
     print("Test: current model cost defaults are the Claude 5 family rates")
-    _assert(ic.DEFAULT_CONFIG["costs"]["opus_per_1m_tokens"] == 5.00, "opus 5 rate")
+    _assert(ic.DEFAULT_CONFIG["costs"]["opus_per_1m_tokens"] == 4.00, "opus 5.5 rate (replaced opus 5)")
     _assert(ic.DEFAULT_CONFIG["costs"]["sonnet_per_1m_tokens"] == 2.00, "sonnet 5 rate")
     _assert(ic.DEFAULT_CONFIG["costs"]["haiku_per_1m_tokens"] == 1.00, "haiku 4.5 rate")
     _assert(ic.DEFAULT_CONFIG["costs"]["fable_per_1m_tokens"] == 10.00, "fable 5.1 rate present")
@@ -49,7 +49,7 @@ def run():
         "costs": {"opus_per_1m_tokens": 15.00, "sonnet_per_1m_tokens": 3.00, "haiku_per_1m_tokens": 0.80},
     }
     migrated = ic.migrate_config(old)
-    _assert(migrated["costs"]["opus_per_1m_tokens"] == 5.00, "stale opus rate refreshed")
+    _assert(migrated["costs"]["opus_per_1m_tokens"] == 4.00, "stale opus rate refreshed")
     _assert(migrated["costs"]["sonnet_per_1m_tokens"] == 2.00, "stale sonnet rate refreshed")
     _assert(migrated["costs"]["haiku_per_1m_tokens"] == 1.00, "stale haiku rate refreshed")
     _assert(migrated["costs"]["fable_per_1m_tokens"] == 10.00, "new fable rate added for existing config")
@@ -92,6 +92,12 @@ def run():
     _assert(models["claude-opus-5-5"] == {"input": 4.0, "output": 20.0, "cache_read": 0.20}, "Opus 5.5 rates")
     _assert(models["claude-fable-5-1"]["cache_read"] == 0.25, "Fable 5.1 cache read is 0.025x, not 0.1x")
     migrated_costs = ic.migrate_config({"version": "1.6", "costs": {"opus_per_1m_tokens": 5.0}})["costs"]
+    _assert(migrated_costs["opus_per_1m_tokens"] == 4.00, "old opus 5 default (5.00) refreshed to opus 5.5 (4.00)")
+    kept = ic.migrate_config({"version": "1.7", "costs": {"opus_per_1m_tokens": 4.5}})["costs"]
+    _assert(kept["opus_per_1m_tokens"] == 4.5, "customized opus rate kept")
+    _assert(ic.model_rates("claude-opus-5-5") == (4.0, 0.20), "model_rates exact id")
+    _assert(ic.model_rates("claude-haiku-4-5-20251001") == (1.0, 0.10), "model_rates with date suffix")
+    _assert(ic.model_rates("claude-opus-5-7") is None, "unknown model has no rate")
     _assert("claude-sonnet-5" in migrated_costs["models"], "1.6 -> 1.7 migration adds the rate table")
     custom = ic.migrate_config({"version": "1.6", "costs": {"models": {
         "claude-opus-5-5": {"input": 3.0, "output": 15.0, "cache_read": 0.15},

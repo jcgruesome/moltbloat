@@ -6,7 +6,7 @@ import sys
 from datetime import datetime, timezone
 
 CONFIG_PATH = os.path.expanduser("~/.moltbloat/config.json")
-CONFIG_VERSION = "1.7"
+CONFIG_VERSION = "1.8"
 
 DEFAULT_CONFIG = {
     "version": CONFIG_VERSION,
@@ -32,12 +32,13 @@ DEFAULT_CONFIG = {
     },
     "costs": {
         "fable_per_1m_tokens": 10.00,
-        "opus_per_1m_tokens": 5.00,
+        "opus_per_1m_tokens": 4.00,  # Opus 5.5, which replaced Opus 5
         "sonnet_per_1m_tokens": 2.00,
         "haiku_per_1m_tokens": 1.00,
         "context_window_tokens": 1000000,
         "context_windows": {
             "fable_5_1": 1000000,
+            "opus_5_5": 1000000,
             "opus_5": 1000000,
             "sonnet_5": 1000000,
             "haiku_4_5": 200000
@@ -100,9 +101,9 @@ DEFAULT_CONFIG = {
 # A deep-merge migration alone can't tell "user customized this" from "user
 # never touched this, it's still the old default" — so refresh a value only
 # when it still equals the OLD default below; a genuinely customized value is
-# left alone. Each entry: dotted path -> value it used to default to.
+# left alone. Each entry: dotted path -> the values it used to default to.
 SUPERSEDED_DEFAULTS = {
-    "costs.opus_per_1m_tokens": 15.00,
+    "costs.opus_per_1m_tokens": (15.00, 5.00),
     "costs.sonnet_per_1m_tokens": 3.00,
     "costs.haiku_per_1m_tokens": 0.80,
 }
@@ -114,7 +115,8 @@ def _refresh_superseded_defaults(config):
         section, key = dotted.split(".", 1)
         if section not in config or key not in config[section]:
             continue
-        if config[section][key] == old_default:
+        olds = old_default if isinstance(old_default, tuple) else (old_default,)
+        if config[section][key] in olds:
             config[section][key] = DEFAULT_CONFIG[section][key]
 
 
@@ -126,6 +128,15 @@ def _merge_rate_table(config, user_config):
     config["costs"] = dict(config.get("costs") or {})
     config["costs"]["models"] = {**DEFAULT_CONFIG["costs"]["models"], **user_models}
     return config
+
+
+def model_rates(model, config=None):
+    """(input, cache_read) per 1M for a model id from `costs.models`: an
+    exact id, or the id plus a -YYYYMMDD date suffix. None if unknown."""
+    import re
+    models = ((config or load_config()).get("costs") or {}).get("models") or {}
+    entry = models.get(model) or models.get(re.sub(r"-\d{8}$", "", model or ""))
+    return (entry["input"], entry["cache_read"]) if entry else None
 
 
 def migrate_config(old_config):
