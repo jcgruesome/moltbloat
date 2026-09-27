@@ -71,6 +71,8 @@ def split_lines(text):
     would renumber lines against editors and let a rewrite turn those
     characters into real newlines.
     """
+    if not text:
+        return []
     lines = text.split("\n")
     if text.endswith("\n"):
         lines.pop()
