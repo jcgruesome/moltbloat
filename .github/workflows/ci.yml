@@ -109,3 +109,8 @@ jobs:
 
       - name: Run snapshot reminder tests
         run: python3 scripts/test-check-snapshot-age.py
+
+      - name: Run instruction lint tests
+        run: |
+          python3 scripts/test-instruction-files.py
+          python3 scripts/test-instruction-lint.py
