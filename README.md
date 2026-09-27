@@ -120,6 +120,9 @@ Anthropic recommends periodically rewriting CLAUDE.md because Claude Code itself
 ### Delegation cost
 `/moltbloat:usage` prices every subagent run from its own recorded tokens (per-model rates, cache writes and reads, output) and shows spend by agent type and model, the fixed cost of spinning up a fresh subagent, and Opus/Fable runs that only read files and replied briefly, re-priced on a cheaper model as a candidate rather than a verdict. `/moltbloat:audit` flags agents with no `model:` pin that have real spend, and instruction prose that asks for a model tier an agent's pin contradicts.
 
+### Guarded fixes
+`/moltbloat:clean` can apply three instruction fixes, one confirmed change at a time: remove leftover import markers and exact duplicate sections, drop one side of a drifted duplicate you choose, or add a `model:` pin to an agent. Each shows the diff first, backs the file up to `~/.moltbloat/backups/`, refuses if the file changed after you reviewed it, and never touches plugin-owned files.
+
 ### Usage-aware recommendations
 Cross-references audit findings with actual usage data. A plugin with zero usage that duplicates another plugin's functionality gets flagged as high priority for removal. Usage tracking is silent and automatic.
 

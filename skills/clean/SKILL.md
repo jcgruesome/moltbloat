@@ -28,6 +28,10 @@ Act on findings from `/moltbloat:audit`. Walk through each finding interactively
 - ALWAYS offer to skip any finding
 - For plugin uninstalls, prefer `claude plugin remove` over manual deletion
 - Back up configs before modifying settings files
+- Instruction files and agent definitions are only changed through
+  `scripts/apply-instruction-change.py`, which previews first, backs up to
+  `~/.moltbloat/backups/<UTC time>/`, refuses plugin-owned files, and
+  refuses if the file changed after the user reviewed the diff
 </Safety>
 
 <Steps>
@@ -170,6 +174,59 @@ Act on findings from `/moltbloat:audit`. Walk through each finding interactively
    Proceed? (yes/no/skip)
    ```
 
+   ### Instruction file changes (from audit Check 15)
+
+   Three finding kinds have an apply path. For each one: run the action with
+   `--dry-run`, show the user the `diff` it returns, and ask. Only on "yes",
+   run it again without `--dry-run`, passing the `sha256` from the dry run as
+   `--expect-sha256` so nothing is written if the file changed in between.
+   In clean's own dry-run mode, stop after showing the diff.
+
+   **Leftover import markers and exact duplicate sections** (`import_residue`,
+   within-file `duplicate_section`):
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/apply-instruction-change.py" rewrite <file> --dry-run
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/apply-instruction-change.py" rewrite <file> --expect-sha256 <sha256>
+   ```
+   ```
+   ## Finding N: <file> has <k> import markers / repeated sections
+
+   **What**: removes the markers and sections that exactly repeat an earlier
+   section of the same file. Nothing else changes.
+   <diff>
+   **Backup**: ~/.moltbloat/backups/<time>/...
+
+   Apply? (yes/no/skip)
+   ```
+
+   **Drifted duplicate** (`drifted_duplicate`): two diverged versions of one
+   section. Show both locations and the `differences` lines, then ask
+   "keep A / keep B / keep both". Never merge them. For "keep A", drop B (and
+   the reverse), using the dropped section's heading line and text from the
+   finding's `pair`:
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/apply-instruction-change.py" drop-section <file> \
+     --line <heading line> --heading "<heading text>" --dry-run
+   ```
+   The heading check refuses (exit 3) if the line no longer holds that
+   heading. After dropping one section, re-run the audit's Check 15 before
+   handling another finding in the same file, since line numbers shift.
+   "Keep both" changes nothing.
+
+   **Unpinned agent** (audit Check 16 `unpinned_agents`): show its spend and
+   model mix, suggest the model its runs used most, and let the user pick
+   `haiku`, `sonnet`, `opus`, `fable`, or `inherit`:
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/apply-instruction-change.py" pin-model <agent .md> --model <choice> --dry-run
+   ```
+   Plugin agents are refused (the pin belongs in the plugin upstream); say so.
+
+   Emphasis, cross-file duplicates, byte budget, and prose conflicts have no
+   apply path: show the finding and let the user edit.
+
+   Exit codes: 3 = refused (say why, from stderr, and skip the finding);
+   1 = file missing; 2 = bad arguments.
+
 5. **Generate cleanup report**
 
    In **dry-run mode**, output:
@@ -203,6 +260,10 @@ Act on findings from `/moltbloat:audit`. Walk through each finding interactively
    ## Skipped
    - <list each finding the user chose to skip>
    - ...
+
+   ## Files changed
+   - <file> (backup: <backup path>)
+   To undo one: copy its backup back over the file.
 
    ## Disk Space Recovered
    ~X MB

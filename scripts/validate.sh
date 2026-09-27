@@ -157,7 +157,7 @@ else
   ((ERRORS++))
 fi
 
-for s_name in instruction-files instruction-lint delegation-cost; do
+for s_name in instruction-files instruction-lint delegation-cost apply-instruction-change; do
   if python3 -m py_compile "$PLUGIN_ROOT/scripts/$s_name.py" 2>/dev/null; then
     echo "  ✓ $s_name.py: syntax valid"
   else
@@ -194,7 +194,7 @@ else
 fi
 
 # instruction-files and instruction-lint: deterministic fixture-based tests
-for t in test-instruction-files test-instruction-lint test-delegation-cost; do
+for t in test-instruction-files test-instruction-lint test-delegation-cost test-apply-instruction-change; do
   if python3 "$PLUGIN_ROOT/scripts/$t.py" >/dev/null 2>&1; then
     echo "  ✓ $t.py: all assertions pass"
   else

@@ -284,6 +284,13 @@ Surfaces:
   `src/hooks/caveman-activate.js` does for its setup nudge. Needs the ledger
   to record a content hash per hook command per session (a small addition
   to component 1).
+- Built 2026-09-27 as `scripts/apply-instruction-change.py` (actions
+  `rewrite`, `drop-section`, `pin-model`): every action previews a diff and
+  sha256, applies only with the reviewed `--expect-sha256`, backs up to
+  `~/.moltbloat/backups/<UTC time>/` mirroring the absolute path, writes
+  atomically, and refuses plugin-owned, non-Markdown, and CRLF files.
+  `drop-section` checks the heading text at the given line so stale line
+  numbers are refused.
 - `help`, `README.md`, `CLAUDE.md`: document the new checks, and add
   `~/.moltbloat/backups/` to the CLAUDE.md "Data Files" list.
 
