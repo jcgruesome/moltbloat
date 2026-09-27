@@ -174,16 +174,18 @@ Act on findings from `/moltbloat:audit`. Walk through each finding interactively
    Proceed? (yes/no/skip)
    ```
 
-   ### Instruction file changes (from audit Check 15)
+   ### Instruction file changes (from audit Checks 15 and 16)
 
    Three finding kinds have an apply path. For each one: run the action with
    `--dry-run`, show the user the `diff` it returns, and ask. Only on "yes",
-   run it again without `--dry-run`, passing the `sha256` from the dry run as
-   `--expect-sha256` so nothing is written if the file changed in between.
-   In clean's own dry-run mode, stop after showing the diff.
+   run it again without `--dry-run`, passing the `sha256` from that dry run
+   as `--expect-sha256` (the script refuses to write without it, and refuses
+   if the file changed since). In clean's own dry-run mode, stop after
+   showing the diff.
 
    **Leftover import markers and exact duplicate sections** (`import_residue`,
-   within-file `duplicate_section`):
+   within-file `duplicate_section`). One rewrite fixes a whole file, so group
+   these findings by file and offer one change per file:
    ```bash
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/apply-instruction-change.py" rewrite <file> --dry-run
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/apply-instruction-change.py" rewrite <file> --expect-sha256 <sha256>
@@ -194,28 +196,33 @@ Act on findings from `/moltbloat:audit`. Walk through each finding interactively
    **What**: removes the markers and sections that exactly repeat an earlier
    section of the same file. Nothing else changes.
    <diff>
-   **Backup**: ~/.moltbloat/backups/<time>/...
 
    Apply? (yes/no/skip)
    ```
+   If the dry run returns `changed: false`, the duplicate is near-identical
+   rather than exact (or sits under a different parent heading): say so and
+   leave it for the user to edit.
 
    **Drifted duplicate** (`drifted_duplicate`): two diverged versions of one
-   section. Show both locations and the `differences` lines, then ask
-   "keep A / keep B / keep both". Never merge them. For "keep A", drop B (and
-   the reverse), using the dropped section's heading line and text from the
-   finding's `pair`:
+   section. A is `pair[0]` with heading `headings[0]`; B is `pair[1]` with
+   heading `headings[1]`. Each `pair` entry is `file:line`, and the two may be
+   in different files. Show both and the `differences` lines, then ask
+   "keep A / keep B / keep both". Never merge them. "Keep A" drops B; "keep
+   B" drops A; "keep both" changes nothing. To drop one, pass its own file,
+   line, and heading from the finding (never re-read the heading from the
+   file, or the stale check cannot work):
    ```bash
-   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/apply-instruction-change.py" drop-section <file> \
-     --line <heading line> --heading "<heading text>" --dry-run
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/apply-instruction-change.py" drop-section <that file> \
+     --line <that line> --heading "<that heading>" --dry-run
    ```
-   The heading check refuses (exit 3) if the line no longer holds that
-   heading. After dropping one section, re-run the audit's Check 15 before
-   handling another finding in the same file, since line numbers shift.
-   "Keep both" changes nothing.
+   A section with subsections is refused (the drift check compared only its
+   own body); say so and leave it for the user. After a drop, re-run audit
+   Check 15 before handling another finding in the same file, since line
+   numbers shift.
 
    **Unpinned agent** (audit Check 16 `unpinned_agents`): show its spend and
    model mix, suggest the model its runs used most, and let the user pick
-   `haiku`, `sonnet`, `opus`, `fable`, or `inherit`:
+   `haiku`, `sonnet`, `opus`, or `fable`:
    ```bash
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/apply-instruction-change.py" pin-model <agent .md> --model <choice> --dry-run
    ```
@@ -224,8 +231,9 @@ Act on findings from `/moltbloat:audit`. Walk through each finding interactively
    Emphasis, cross-file duplicates, byte budget, and prose conflicts have no
    apply path: show the finding and let the user edit.
 
-   Exit codes: 3 = refused (say why, from stderr, and skip the finding);
-   1 = file missing; 2 = bad arguments.
+   After each write, report the `backup` path from the result. Exit codes:
+   3 = refused (say why, from stderr, and skip the finding); 1 = file
+   missing; 2 = bad arguments.
 
 5. **Generate cleanup report**
 
