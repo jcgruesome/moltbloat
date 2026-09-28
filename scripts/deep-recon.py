@@ -4,7 +4,8 @@
 Emits a FACTS document (markdown, or JSON with --json) — the shared ground truth
 handed to every deep-audit subagent. Stdlib only.
 Usage: deep-recon.py [CONFIG_DIR] [--json]; CONFIG_DIR defaults to $CLAUDE_CONFIG_DIR
-then ~/.claude. State file (.claude.json) found in $HOME or inside CONFIG_DIR (fixtures).
+then ~/.claude. State file (.claude.json): ~/.claude.json for the default config,
+else inside CONFIG_DIR (see paths.state_file).
 """
 import json
 import os
