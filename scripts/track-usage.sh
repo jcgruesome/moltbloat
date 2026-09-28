@@ -5,34 +5,23 @@
 
 set -e
 
-# moltbloat data is kept per Claude config (same rule as scripts/paths.py):
-# ~/.moltbloat for the default ~/.claude, else ~/.moltbloat/configs/<encoded dir>.
-CFG="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-CFG="${CFG/#\~/$HOME}"
-CFG_REAL="$(cd "$CFG" 2>/dev/null && pwd -P || printf %s "$CFG")"
-DEF_REAL="$(cd "$HOME/.claude" 2>/dev/null && pwd -P || printf %s "$HOME/.claude")"
-if [ "$CFG_REAL" = "$DEF_REAL" ]; then
-    USAGE_DIR="$HOME/.moltbloat"
-else
-    USAGE_DIR="$HOME/.moltbloat/configs/$(printf %s "$CFG_REAL" | sed 's/[^A-Za-z0-9]/-/g')"
-fi
-USAGE_FILE="$USAGE_DIR/usage.jsonl"
-ERROR_LOG="$USAGE_DIR/errors.log"
-
-# Ensure directory exists
-mkdir -p "$USAGE_DIR" 2>/dev/null || {
-    echo "[moltbloat] Error: Cannot create $USAGE_DIR" >&2
-    exit 1
-}
-
-export MOLTBLOAT_USAGE_FILE="$USAGE_FILE"
-export MOLTBLOAT_ERROR_LOG="$ERROR_LOG"
+# moltbloat data is kept per Claude config; scripts/paths.py decides where
+# (resolved inside the Python step below, so there is one rule, not two).
+export MOLTBLOAT_SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
 
 PYSCRIPT=$(cat <<'PYEOF'
 import sys, json, fcntl, re, time, os
 
-usage_file = os.environ["MOLTBLOAT_USAGE_FILE"]
-error_log = os.environ["MOLTBLOAT_ERROR_LOG"]
+sys.path.insert(0, os.environ["MOLTBLOAT_SCRIPTS"])
+import paths
+usage_dir = paths.moltbloat_home()
+try:
+    os.makedirs(usage_dir, exist_ok=True)
+except OSError as e:
+    sys.stderr.write("[moltbloat] Error: Cannot create " + usage_dir + ": " + str(e) + "\n")
+    sys.exit(1)
+usage_file = os.path.join(usage_dir, "usage.jsonl")
+error_log = os.path.join(usage_dir, "errors.log")
 
 def log_error(msg):
     try:

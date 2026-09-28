@@ -14,6 +14,9 @@ import json
 import os
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths  # noqa: E402  (active Claude config dir and its state file)
+
 MANAGED_SETTINGS_PATHS = {
     "darwin": "/Library/Application Support/ClaudeCode/managed-settings.json",
     "linux": "/etc/claude-code/managed-settings.json",
@@ -147,13 +150,13 @@ def main(argv):
             positional.append(a)
         i += 1
 
-    config_dir = os.path.expanduser(positional[0] if positional else os.environ.get("CLAUDE_CONFIG_DIR", "~/.claude"))
+    config_dir = os.path.expanduser(positional[0]) if positional else paths.config_dir()
     if managed_settings_path is None:
         managed_settings_path = default_managed_settings_path()
 
-    state_candidates = [os.path.join(os.path.expanduser("~"), ".claude.json"),
-                        os.path.join(config_dir, ".claude.json")]
-    state_path = next((p for p in state_candidates if os.path.isfile(p)), None)
+    state_path = paths.state_file(config_dir)
+    if not os.path.isfile(state_path):
+        state_path = None
 
     managed_servers = load_managed_servers(managed_settings_path)
     local_sources = collect_local_servers(config_dir, state_path)

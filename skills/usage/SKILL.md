@@ -19,7 +19,7 @@ Show what's actually being used versus what's just sitting there consuming conte
 - User wants a one-time structural audit — use `/moltbloat:audit`
 </Do_Not_Use_When>
 
-**Paths:** `~/.claude` below means the active Claude config dir (`$CLAUDE_CONFIG_DIR` when set, else `~/.claude`); `~/.moltbloat` means moltbloat's data dir for that config (`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home`). Bash blocks already resolve both; name the actual directories in the report.
+**Paths:** `~/.claude` means the active Claude config dir (`$CLAUDE_CONFIG_DIR` if set); `~/.moltbloat` means moltbloat's data dir for it (`scripts/paths.py moltbloat-home`).
 
 <Steps>
 
@@ -61,12 +61,13 @@ Show what's actually being used versus what's just sitting there consuming conte
    truth — it only corroborates and fills any gaps (e.g. very recent sessions):
 
    ```bash
-   if [ -f "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"/usage.jsonl ] && [ "$(wc -l < "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"/usage.jsonl)" -gt 0 ]; then
+   MB="$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)" || exit 1
+   if [ -f "$MB"/usage.jsonl ] && [ "$(wc -l < "$MB"/usage.jsonl)" -gt 0 ]; then
      # Skill / agent / mcp / tool counts from the hook log
-     grep '"type":"skill"' "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"/usage.jsonl | grep -o '"name":"[^"]*"' | sort | uniq -c | sort -rn
-     grep '"type":"agent"' "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"/usage.jsonl | grep -o '"name":"[^"]*"' | sort | uniq -c | sort -rn
-     grep '"type":"mcp"'   "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"/usage.jsonl | grep -o '"name":"[^"]*"' | sort | uniq -c | sort -rn
-     grep '"type":"tool"'  "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"/usage.jsonl | grep -o '"name":"[^"]*"' | sort | uniq -c | sort -rn
+     grep '"type":"skill"' "$MB"/usage.jsonl | grep -o '"name":"[^"]*"' | sort | uniq -c | sort -rn
+     grep '"type":"agent"' "$MB"/usage.jsonl | grep -o '"name":"[^"]*"' | sort | uniq -c | sort -rn
+     grep '"type":"mcp"'   "$MB"/usage.jsonl | grep -o '"name":"[^"]*"' | sort | uniq -c | sort -rn
+     grep '"type":"tool"'  "$MB"/usage.jsonl | grep -o '"name":"[^"]*"' | sort | uniq -c | sort -rn
    fi
    ```
 
@@ -78,8 +79,9 @@ Show what's actually being used versus what's just sitting there consuming conte
    Count how many tool invocations were tracked (each one triggered the PostToolUse hook). Calculate the hook overhead:
 
    ```bash
-   total_invocations=$(wc -l < "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"/usage.jsonl)
-   unique_days=$(grep -o '"date":"[^"]*"' "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"/usage.jsonl | sort -u | wc -l)
+   MB="$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)" || exit 1
+   total_invocations=$(wc -l < "$MB"/usage.jsonl)
+   unique_days=$(grep -o '"date":"[^"]*"' "$MB"/usage.jsonl | sort -u | wc -l)
    ```
 
    For each active plugin with hooks (from `installed_plugins.json`), read its `hooks/hooks.json` and count:
@@ -305,7 +307,8 @@ Show what's actually being used versus what's just sitting there consuming conte
 
    Check if the usage file has grown large enough to benefit from compaction:
    ```bash
-   wc -l < "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"/usage.jsonl 2>/dev/null
+   MB="$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)" || exit 1
+   wc -l < "$MB"/usage.jsonl 2>/dev/null
    ```
 
    Get thresholds from config:
@@ -334,12 +337,13 @@ Show what's actually being used versus what's just sitting there consuming conte
 
    **8c.** Write compacted file:
    ```bash
+   MB="$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)" || exit 1
    # Back up first
-   cp "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"/usage.jsonl "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"/usage.jsonl.bak
+   cp "$MB"/usage.jsonl "$MB"/usage.jsonl.bak
 
    # Write: old summaries + recent raw entries
-   cat <summaries> <recent_entries> > "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"/usage.jsonl.new
-   mv "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"/usage.jsonl.new "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"/usage.jsonl
+   cat <summaries> <recent_entries> > "$MB"/usage.jsonl.new
+   mv "$MB"/usage.jsonl.new "$MB"/usage.jsonl
    ```
 
    **8d.** Report:

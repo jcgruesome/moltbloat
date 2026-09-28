@@ -20,7 +20,7 @@ Capture the current state of the Claude Code ecosystem as a JSON baseline. On su
 - User wants to clean up — use `/moltbloat:clean`
 </Do_Not_Use_When>
 
-**Paths:** `~/.claude` below means the active Claude config dir (`$CLAUDE_CONFIG_DIR` when set, else `~/.claude`); `~/.moltbloat` means moltbloat's data dir for that config (`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home`). Bash blocks already resolve both; name the actual directories in the report.
+**Paths:** `~/.claude` means the active Claude config dir (`$CLAUDE_CONFIG_DIR` if set); `~/.moltbloat` means moltbloat's data dir for it (`scripts/paths.py moltbloat-home`).
 
 <Steps>
 
@@ -39,7 +39,8 @@ Capture the current state of the Claude Code ecosystem as a JSON baseline. On su
 3. **Check for existing baseline (snapshot mode)**
 
    ```bash
-   cat "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"/baseline.json 2>/dev/null
+   MB="$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)" || exit 1
+   cat "$MB"/baseline.json 2>/dev/null
    ```
 
    If a baseline exists, load it for comparison. If not, this is the first snapshot.
@@ -167,7 +168,8 @@ Capture the current state of the Claude Code ecosystem as a JSON baseline. On su
 7. **Save the new baseline and handle exports**
 
    ```bash
-   mkdir -p "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"
+   MB="$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)" || exit 1
+   mkdir -p "$MB"
    ```
 
    If `--export <path>` was specified:
@@ -204,8 +206,9 @@ Capture the current state of the Claude Code ecosystem as a JSON baseline. On su
 8. **Trends mode — analyze history**
 
    ```bash
-   wc -l "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"/history.log 2>/dev/null
-   cat "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"/history.log 2>/dev/null
+   MB="$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)" || exit 1
+   wc -l "$MB"/history.log 2>/dev/null
+   cat "$MB"/history.log 2>/dev/null
    ```
 
    If file doesn't exist or has < 2 entries:

@@ -50,13 +50,66 @@ def run():
             os.environ["CLAUDE_CONFIG_DIR"] = alt
             _assert(paths.config_dir(home) == alt and paths.projects_dir(home) == os.path.join(alt, "projects"),
                     "CLAUDE_CONFIG_DIR sets config and projects dirs")
-            expected = os.path.join(home, ".moltbloat", "configs", paths.encode(alt))
-            _assert(paths.moltbloat_home(home) == expected and "-work-cfg-claude-alt" in expected,
-                    "non-default config gets its own data dir (non-alphanumerics become -)")
+            expected = paths.moltbloat_home(home)
+            import re as _re
+            _assert(os.path.dirname(expected) == os.path.join(home, ".moltbloat", "configs")
+                    and _re.fullmatch(_re.escape(paths.encode(alt)) + r"-[0-9a-f]{8}", os.path.basename(expected))
+                    and "-work-cfg-claude-alt" in expected,
+                    "non-default config gets its own data dir: readable name plus 8-digit hash")
             os.environ["CLAUDE_CONFIG_DIR"] = os.path.join(home, ".claude")
             _assert(paths.moltbloat_home(home) == os.path.join(home, ".moltbloat"),
                     "CLAUDE_CONFIG_DIR pointing at ~/.claude is the default config")
             os.environ.pop("CLAUDE_CONFIG_DIR")
+
+            print("Test: edge cases resolve consistently")
+            os.environ["CLAUDE_CONFIG_DIR"] = ""
+            _assert(paths.moltbloat_home(home) == os.path.join(home, ".moltbloat"), "empty CLAUDE_CONFIG_DIR = default")
+            os.environ["CLAUDE_CONFIG_DIR"] = alt + "/"
+            _assert(paths.moltbloat_home(home) == expected, "trailing slash ignored")
+            link = os.path.join(d, "alt-link")
+            os.symlink(alt, link)
+            os.environ["CLAUDE_CONFIG_DIR"] = link
+            _assert(paths.moltbloat_home(home) == expected, "symlinked config dir resolves to the same data dir")
+            twin = os.path.join(d, "work.cfg", "claude-alt")
+            os.makedirs(twin)
+            os.environ["CLAUDE_CONFIG_DIR"] = twin
+            _assert(paths.moltbloat_home(home) != expected and paths.encode(twin) == paths.encode(alt),
+                    "dirs with the same readable name still get distinct data dirs (hash suffix)")
+            os.environ.pop("CLAUDE_CONFIG_DIR")
+
+            print("Test: state file per config")
+            with open(os.path.join(home, ".claude.json"), "w") as f:
+                f.write("{}")
+            _assert(paths.state_file(os.path.join(home, ".claude"), home) == os.path.join(home, ".claude.json"),
+                    "default config uses ~/.claude.json")
+            _assert(paths.state_file(alt, home) == os.path.join(alt, ".claude.json"),
+                    "other config uses its own state file, never ~/.claude.json")
+
+            print("Test: managed-mcp-check reads the active config's state file")
+            with open(os.path.join(home, ".claude.json"), "w") as f:
+                json.dump({"mcpServers": {"default-only": {}}}, f)
+            with open(os.path.join(alt, ".claude.json"), "w") as f:
+                json.dump({"mcpServers": {"alt-only": {}}}, f)
+            managed = os.path.join(d, "managed.json")
+            with open(managed, "w") as f:
+                json.dump({"managedMcpServers": {"default-only": {}, "alt-only": {}}}, f)
+            r = subprocess.run([sys.executable, os.path.join(HERE, "managed-mcp-check.py"), "--managed-settings", managed, "--json"],
+                               env=env_for(home, alt), capture_output=True, text=True, check=True)
+            names = {c["name"] for c in json.loads(r.stdout)["collisions"]}
+            _assert(names == {"alt-only"}, "collision found in the alt config's state, none from the default's")
+
+            print("Test: a non-default config inherits moltbloat settings until it has its own")
+            os.makedirs(os.path.join(home, ".moltbloat"), exist_ok=True)
+            with open(os.path.join(home, ".moltbloat", "config.json"), "w") as f:
+                json.dump({"version": "1.8", "thresholds": {"token_warning": 12345}}, f)
+            get = ("import importlib.util;s=importlib.util.spec_from_file_location('ic','init-config.py');"
+                   "m=importlib.util.module_from_spec(s);s.loader.exec_module(m);print(m.get_value('thresholds.token_warning'))")
+            _assert(py(get, env_for(home, alt)) == "12345", "inherited from ~/.moltbloat/config.json")
+            os.makedirs(expected, exist_ok=True)
+            with open(os.path.join(expected, "config.json"), "w") as f:
+                json.dump({"version": "1.8", "thresholds": {"token_warning": 777}}, f)
+            _assert(py(get, env_for(home, alt)) == "777", "own config.json wins once present")
+            os.remove(os.path.join(expected, "config.json"))
 
             print("Test: CLI")
             out = subprocess.run([sys.executable, os.path.join(HERE, "paths.py"), "moltbloat-home"],

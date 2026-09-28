@@ -19,7 +19,7 @@ Fast, focused answer to "what does plugin X do and should I keep it?" Shows what
 - User wants a full audit — use `/moltbloat:audit`
 </Do_Not_Use_When>
 
-**Paths:** `~/.claude` below means the active Claude config dir (`$CLAUDE_CONFIG_DIR` when set, else `~/.claude`); `~/.moltbloat` means moltbloat's data dir for that config (`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home`). Bash blocks already resolve both; name the actual directories in the report.
+**Paths:** `~/.claude` means the active Claude config dir (`$CLAUDE_CONFIG_DIR` if set); `~/.moltbloat` means moltbloat's data dir for it (`scripts/paths.py moltbloat-home`).
 
 <Steps>
 

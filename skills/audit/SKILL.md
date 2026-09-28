@@ -21,7 +21,7 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
 - User only wants token cost info — use `/moltbloat:token-budget` instead
 </Do_Not_Use_When>
 
-**Paths:** `~/.claude` below means the active Claude config dir (`$CLAUDE_CONFIG_DIR` when set, else `~/.claude`); `~/.moltbloat` means moltbloat's data dir for that config (`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home`). Bash blocks already resolve both; name the actual directories in the report.
+**Paths:** `~/.claude` means the active Claude config dir (`$CLAUDE_CONFIG_DIR` if set); `~/.moltbloat` means moltbloat's data dir for it (`scripts/paths.py moltbloat-home`).
 
 <Steps>
 
@@ -53,7 +53,7 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    Check if Claude Code is initialized:
    ```bash
    if [ ! -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}" ]; then
-     echo "ERROR: Claude Code not found at "${CLAUDE_CONFIG_DIR:-$HOME/.claude}""
+     echo "ERROR: Claude Code not found at ${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
      echo "Please ensure Claude Code is installed and initialized."
      exit 1
    fi
@@ -77,11 +77,12 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
 
    **Load usage data (if available):**
    ```bash
+   MB="$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)" || exit 1
    # Check if usage tracking data exists
-   wc -l "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"/usage.jsonl 2>/dev/null || echo 0
+   wc -l "$MB"/usage.jsonl 2>/dev/null || echo 0
    
    # Extract plugin usage counts from last 30 days
-   grep '"type":"skill"' "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"/usage.jsonl 2>/dev/null | \
+   grep '"type":"skill"' "$MB"/usage.jsonl 2>/dev/null | \
      grep -o '"name":"[^"]*"' | sort | uniq -c | sort -rn
    ```
 

@@ -9,13 +9,18 @@ script resolves paths through this module instead of assuming ~/.claude.
 moltbloat's own data (usage log, snapshots, profiles, config, backups) is
 kept per Claude config so two configs never mix their usage or baselines:
   default config (~/.claude)  -> ~/.moltbloat
-  any other config dir        -> ~/.moltbloat/configs/<encoded config dir>
-where the encoding turns every non-alphanumeric character of the resolved
-path into '-' (the same rule Claude Code uses for projects/ dir names).
+  any other config dir        -> ~/.moltbloat/configs/<encoded dir>-<hash>
+where <encoded dir> turns every non-alphanumeric character of the resolved
+path into '-' (readable) and <hash> is the first 8 hex digits of its sha256
+(so /a/claude-work and /a/claude.work never share data).
+
+A non-default config reads moltbloat's settings (config.json) from the
+default data dir until it has its own; see init-config.py.
 
 CLI, for skill bash snippets:
-  python3 paths.py config-dir | projects-dir | plugins-dir | moltbloat-home
+  python3 paths.py config-dir | projects-dir | plugins-dir | moltbloat-home | state-file
 """
+import hashlib
 import os
 import re
 import sys
@@ -51,17 +56,38 @@ def encode(path):
     return re.sub(r"[^A-Za-z0-9]", "-", os.path.realpath(path))
 
 
+def default_moltbloat_home(home=None):
+    return os.path.join(_home(home), ".moltbloat")
+
+
 def moltbloat_home(home=None):
     """moltbloat's data dir for the active Claude config."""
-    base = os.path.join(_home(home), ".moltbloat")
     if is_default_config(home):
-        return base
-    return os.path.join(base, "configs", encode(config_dir(home)))
+        return default_moltbloat_home(home)
+    real = os.path.realpath(config_dir(home))
+    digest = hashlib.sha256(real.encode("utf-8")).hexdigest()[:8]
+    return os.path.join(default_moltbloat_home(home), "configs", f"{encode(real)}-{digest}")
+
+
+def state_file(config=None, home=None):
+    """Claude Code's global state file (.claude.json) for a config dir.
+
+    The default config keeps it at ~/.claude.json (older installs inside
+    ~/.claude). A non-default CLAUDE_CONFIG_DIR keeps it inside that dir,
+    and the default config's file is never used for it.
+    """
+    cfg = config or config_dir(home)
+    if os.path.realpath(cfg) == os.path.realpath(default_config_dir(home)):
+        for p in (os.path.join(_home(home), ".claude.json"), os.path.join(cfg, ".claude.json")):
+            if os.path.isfile(p):
+                return p
+        return os.path.join(_home(home), ".claude.json")
+    return os.path.join(cfg, ".claude.json")
 
 
 def main(argv):
-    commands = {"config-dir": config_dir, "projects-dir": projects_dir,
-                "plugins-dir": plugins_dir, "moltbloat-home": moltbloat_home}
+    commands = {"config-dir": config_dir, "projects-dir": projects_dir, "plugins-dir": plugins_dir,
+                "moltbloat-home": moltbloat_home, "state-file": state_file}
     if len(argv) != 2 or argv[1] not in commands:
         sys.stderr.write("usage: paths.py {" + "|".join(commands) + "}\n")
         return 2
