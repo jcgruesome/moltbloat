@@ -14,6 +14,8 @@ Display all available moltbloat commands with brief descriptions so the user kno
 - User wants to see new commands after an update
 </Use_When>
 
+**Paths:** `~/.claude` below means the active Claude config dir (`$CLAUDE_CONFIG_DIR` when set, else `~/.claude`); `~/.moltbloat` means moltbloat's data dir for that config (`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home`). Bash blocks already resolve both; name the actual directories in the report.
+
 <Steps>
 
 1. **Show the command reference**

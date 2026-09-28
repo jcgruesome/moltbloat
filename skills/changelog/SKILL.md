@@ -21,12 +21,14 @@ Compare the current Claude Code ecosystem against a previous baseline snapshot (
 - No baseline exists yet — direct user to run `/moltbloat:snapshot` first
 </Do_Not_Use_When>
 
+**Paths:** `~/.claude` below means the active Claude config dir (`$CLAUDE_CONFIG_DIR` when set, else `~/.claude`); `~/.moltbloat` means moltbloat's data dir for that config (`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home`). Bash blocks already resolve both; name the actual directories in the report.
+
 <Steps>
 
 1. **Load the baseline snapshot**
 
    ```bash
-   cat ~/.moltbloat/baseline.json 2>/dev/null
+   cat "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"/baseline.json 2>/dev/null
    ```
 
    If no baseline exists, tell the user:
@@ -40,7 +42,7 @@ Compare the current Claude Code ecosystem against a previous baseline snapshot (
 
    **Plugins:**
    ```bash
-   cat ~/.claude/plugins/installed_plugins.json 2>/dev/null
+   cat "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/installed_plugins.json 2>/dev/null
    ```
 
    **Claude Code version:**

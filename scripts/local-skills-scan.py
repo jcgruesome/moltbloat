@@ -16,7 +16,10 @@ import json
 import os
 import sys
 
-DEFAULT_DIRS = [os.path.expanduser("~/.claude/skills"), os.path.join(os.getcwd(), ".claude", "skills")]
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths  # noqa: E402  (active Claude config dir: $CLAUDE_CONFIG_DIR or ~/.claude)
+
+DEFAULT_DIRS = [os.path.join(paths.config_dir(), "skills"), os.path.join(os.getcwd(), ".claude", "skills")]
 
 
 def find_local_skills(root):

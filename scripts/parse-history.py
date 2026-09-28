@@ -19,7 +19,10 @@ import os
 import sys
 from datetime import datetime, timedelta, timezone
 
-PROJECTS_DIR = os.path.expanduser("~/.claude/projects")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths  # noqa: E402  (active Claude config dir: $CLAUDE_CONFIG_DIR or ~/.claude)
+
+PROJECTS_DIR = paths.projects_dir()
 
 
 def categorize(name, inp):

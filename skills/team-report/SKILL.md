@@ -19,6 +19,8 @@ Collect and aggregate moltbloat snapshots from multiple team members to identify
 - Only one person uses Claude Code on the team
 </Do_Not_Use_When>
 
+**Paths:** `~/.claude` below means the active Claude config dir (`$CLAUDE_CONFIG_DIR` when set, else `~/.claude`); `~/.moltbloat` means moltbloat's data dir for that config (`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home`). Bash blocks already resolve both; name the actual directories in the report.
+
 <Steps>
 
 1. **Collect snapshots**
@@ -29,7 +31,7 @@ Collect and aggregate moltbloat snapshots from multiple team members to identify
    Team members export their snapshots to a shared location:
    ```bash
    # Each team member runs:
-   cp ~/.moltbloat/baseline.json /shared/moltbloat/<username>.json
+   cp "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"/baseline.json /shared/moltbloat/<username>.json
    ```
    Then read all files from that directory.
 

@@ -20,6 +20,8 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
 - User wants to remove things — use `/moltbloat:clean`
 </Do_Not_Use_When>
 
+**Paths:** `~/.claude` below means the active Claude config dir (`$CLAUDE_CONFIG_DIR` when set, else `~/.claude`); `~/.moltbloat` means moltbloat's data dir for that config (`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home`). Bash blocks already resolve both; name the actual directories in the report.
+
 <Steps>
 
 1. **Announce**
@@ -94,7 +96,7 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
    These are always loaded into context:
    ```bash
    # Global
-   wc -c ~/.claude/CLAUDE.md 2>/dev/null
+   wc -c "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/CLAUDE.md 2>/dev/null
    # Project-level (for current project)
    wc -c ./CLAUDE.md 2>/dev/null
    wc -c ./.claude/CLAUDE.md 2>/dev/null
@@ -103,11 +105,11 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
    **2b. Rules**
    All `.md` files in `~/.claude/rules/` are loaded:
    ```bash
-   find ~/.claude/rules -name "*.md" -type f -exec cat {} + 2>/dev/null | wc -c
+   find "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/rules -name "*.md" -type f -exec cat {} + 2>/dev/null | wc -c
    ```
    Also measure per-directory to show breakdown:
    ```bash
-   for dir in ~/.claude/rules/*/; do
+   for dir in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/rules/*/; do
      name=$(basename "$dir")
      size=$(find "$dir" -name "*.md" -type f -exec cat {} + 2>/dev/null | wc -c)
      echo "$name: $size bytes"
@@ -126,7 +128,7 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
    Each MCP server registers tools that consume context. Count the number of MCP tools visible in the current session by checking deferred tools:
    ```bash
    # Count MCP tool entries from plugin configs
-   for mcp_file in $(find ~/.claude/plugins/cache -name ".mcp.json" -type f 2>/dev/null); do
+   for mcp_file in $(find "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache -name ".mcp.json" -type f 2>/dev/null); do
      plugin=$(echo "$mcp_file" | sed 's|.*/cache/[^/]*/\([^/]*\)/.*|\1|')
      echo "$plugin: $mcp_file"
    done
@@ -138,7 +140,7 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
    ```bash
    # Count total skills across all plugins
    total=0
-   for plugin_dir in ~/.claude/plugins/cache/*/*/skills/*/; do
+   for plugin_dir in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/*/*/skills/*/; do
      total=$((total + 1))
    done 2>/dev/null
    echo "Total skills: $total"
@@ -148,14 +150,14 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
    **2f. Hook injection**
    Hooks inject `<system-reminder>` content. Measure hook definitions:
    ```bash
-   find ~/.claude -name "hooks.json" -type f 2>/dev/null -exec wc -c {} +
+   find "${CLAUDE_CONFIG_DIR:-$HOME/.claude}" -name "hooks.json" -type f 2>/dev/null -exec wc -c {} +
    ```
    Note: Hook *output* varies per invocation and can't be pre-measured. Flag hooks that run on every tool call as potentially expensive.
 
    **2g. Agent definitions**
    Local agents are registered and their descriptions consume context:
    ```bash
-   for f in ~/.claude/agents/*.md; do
+   for f in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/agents/*.md; do
      name=$(basename "$f" .md)
      size=$(wc -c < "$f")
      echo "$name: $size bytes"
@@ -171,6 +173,7 @@ Measure how much of your context window is consumed by the Claude Code ecosystem
    ```
    # Moltbloat Token Budget
 
+   **Claude config**: <config dir from `paths.py config-dir`> (moltbloat data: <`paths.py moltbloat-home`>)
    **Model**: <model in use, or "Opus 5.5 / Sonnet 5 / Fable 5.1 (assumed)" if unstated>
    **Context window**: <window for that model, e.g. 1,000,000 tokens, or 200,000 tokens for Haiku 4.5>
    **Total ecosystem cost**: ~X tokens (Y% of window)

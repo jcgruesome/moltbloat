@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+"""Where Claude Code and moltbloat keep their files, for the active config.
+
+Claude Code reads its config dir from CLAUDE_CONFIG_DIR, falling back to
+~/.claude. Transcripts (projects/), plugins, agents, rules, skills,
+settings.json, and the user CLAUDE.md all live there, so every moltbloat
+script resolves paths through this module instead of assuming ~/.claude.
+
+moltbloat's own data (usage log, snapshots, profiles, config, backups) is
+kept per Claude config so two configs never mix their usage or baselines:
+  default config (~/.claude)  -> ~/.moltbloat
+  any other config dir        -> ~/.moltbloat/configs/<encoded config dir>
+where the encoding turns every non-alphanumeric character of the resolved
+path into '-' (the same rule Claude Code uses for projects/ dir names).
+
+CLI, for skill bash snippets:
+  python3 paths.py config-dir | projects-dir | plugins-dir | moltbloat-home
+"""
+import os
+import re
+import sys
+
+
+def _home(home=None):
+    return home or os.path.expanduser("~")
+
+
+def default_config_dir(home=None):
+    return os.path.join(_home(home), ".claude")
+
+
+def config_dir(home=None):
+    """The active Claude config dir: $CLAUDE_CONFIG_DIR, else ~/.claude."""
+    env = os.environ.get("CLAUDE_CONFIG_DIR")
+    return os.path.expanduser(env) if env else default_config_dir(home)
+
+
+def is_default_config(home=None):
+    return os.path.realpath(config_dir(home)) == os.path.realpath(default_config_dir(home))
+
+
+def projects_dir(home=None):
+    return os.path.join(config_dir(home), "projects")
+
+
+def plugins_dir(home=None):
+    return os.path.join(config_dir(home), "plugins")
+
+
+def encode(path):
+    return re.sub(r"[^A-Za-z0-9]", "-", os.path.realpath(path))
+
+
+def moltbloat_home(home=None):
+    """moltbloat's data dir for the active Claude config."""
+    base = os.path.join(_home(home), ".moltbloat")
+    if is_default_config(home):
+        return base
+    return os.path.join(base, "configs", encode(config_dir(home)))
+
+
+def main(argv):
+    commands = {"config-dir": config_dir, "projects-dir": projects_dir,
+                "plugins-dir": plugins_dir, "moltbloat-home": moltbloat_home}
+    if len(argv) != 2 or argv[1] not in commands:
+        sys.stderr.write("usage: paths.py {" + "|".join(commands) + "}\n")
+        return 2
+    print(commands[argv[1]]())
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

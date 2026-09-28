@@ -26,6 +26,8 @@ Manage named profiles that enable/disable specific plugins and rule sets. Switch
 - A "restore" command returns to the pre-profile state
 </Safety>
 
+**Paths:** `~/.claude` below means the active Claude config dir (`$CLAUDE_CONFIG_DIR` when set, else `~/.claude`); `~/.moltbloat` means moltbloat's data dir for that config (`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home`). Bash blocks already resolve both; name the actual directories in the report.
+
 <Steps>
 
 1. **Parse the command**
@@ -47,7 +49,7 @@ Manage named profiles that enable/disable specific plugins and rule sets. Switch
 
    Check for saved profiles:
    ```bash
-   ls ~/.moltbloat/profiles/*.json 2>/dev/null
+   ls "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"/profiles/*.json 2>/dev/null
    ```
 
    Always show the built-in profiles plus any custom ones. For built-in profiles, dynamically compute plugin counts and token estimates based on what's actually installed:
@@ -79,7 +81,7 @@ Manage named profiles that enable/disable specific plugins and rule sets. Switch
    Ask the user what they want enabled. Start by showing all installed plugins:
 
    ```bash
-   cat ~/.claude/plugins/installed_plugins.json 2>/dev/null
+   cat "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/installed_plugins.json 2>/dev/null
    ```
 
    Present a checklist of all installed plugins, dynamically grouped by what they provide:
@@ -119,12 +121,12 @@ Manage named profiles that enable/disable specific plugins and rule sets. Switch
    **4a. Save current state**
    ```bash
    # Capture current enabled/disabled state of all plugins
-   cat ~/.claude/plugins/installed_plugins.json > ~/.moltbloat/profiles/_pre-switch-state.json
+   cat "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/installed_plugins.json > "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"/profiles/_pre-switch-state.json
    ```
 
    **4b. Load the target profile**
    ```bash
-   cat ~/.moltbloat/profiles/<name>.json
+   cat "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"/profiles/<name>.json
    ```
 
    For built-in profiles, dynamically categorize installed plugins:
@@ -174,7 +176,7 @@ Manage named profiles that enable/disable specific plugins and rule sets. Switch
 5. **For `restore` — return to pre-switch state**
 
    ```bash
-   cat ~/.moltbloat/profiles/_pre-switch-state.json
+   cat "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"/profiles/_pre-switch-state.json
    ```
 
    Re-enable/disable plugins to match the saved state. Confirm before applying.
@@ -183,7 +185,7 @@ Manage named profiles that enable/disable specific plugins and rule sets. Switch
 
    Read usage data:
    ```bash
-   cat ~/.moltbloat/usage.jsonl 2>/dev/null
+   cat "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"/usage.jsonl 2>/dev/null
    ```
 
    If usage data exists, analyze which plugins have >0 invocations in the last 14 days. Suggest a profile that enables only those plugins.
@@ -207,7 +209,7 @@ Manage named profiles that enable/disable specific plugins and rule sets. Switch
 
    ```bash
    # Get usage data
-   cat ~/.moltbloat/usage.jsonl 2>/dev/null
+   cat "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"/usage.jsonl 2>/dev/null
    
    # Get recent audit findings (if available in conversation history)
    # Or run quick check for zero-skill plugins and duplicates
@@ -277,7 +279,7 @@ Manage named profiles that enable/disable specific plugins and rule sets. Switch
    Export a profile as a portable JSON file that teammates can import:
 
    ```bash
-   cat ~/.moltbloat/profiles/<name>.json 2>/dev/null
+   cat "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"/profiles/<name>.json 2>/dev/null
    ```
 
    If the profile doesn't exist, error and show available profiles.

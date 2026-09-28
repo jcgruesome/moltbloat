@@ -1,11 +1,21 @@
 #!/bin/bash
-# Lightweight usage tracker — logs tool/skill/agent invocations to ~/.moltbloat/usage.jsonl
+# Lightweight usage tracker: logs tool/skill/agent invocations to <moltbloat data dir>/usage.jsonl
 # Called by PostToolUse hook. Receives the hook payload (tool_name, tool_input, ...) as JSON on stdin.
 # Typically completes in under 50ms; hard timeout of 2 seconds set in hooks.json.
 
 set -e
 
-USAGE_DIR="$HOME/.moltbloat"
+# moltbloat data is kept per Claude config (same rule as scripts/paths.py):
+# ~/.moltbloat for the default ~/.claude, else ~/.moltbloat/configs/<encoded dir>.
+CFG="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+CFG="${CFG/#\~/$HOME}"
+CFG_REAL="$(cd "$CFG" 2>/dev/null && pwd -P || printf %s "$CFG")"
+DEF_REAL="$(cd "$HOME/.claude" 2>/dev/null && pwd -P || printf %s "$HOME/.claude")"
+if [ "$CFG_REAL" = "$DEF_REAL" ]; then
+    USAGE_DIR="$HOME/.moltbloat"
+else
+    USAGE_DIR="$HOME/.moltbloat/configs/$(printf %s "$CFG_REAL" | sed 's/[^A-Za-z0-9]/-/g')"
+fi
 USAGE_FILE="$USAGE_DIR/usage.jsonl"
 ERROR_LOG="$USAGE_DIR/errors.log"
 

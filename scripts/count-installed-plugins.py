@@ -15,7 +15,10 @@ import json
 import os
 import sys
 
-DEFAULT_PATH = os.path.expanduser("~/.claude/plugins/installed_plugins.json")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths  # noqa: E402  (active Claude config dir: $CLAUDE_CONFIG_DIR or ~/.claude)
+
+DEFAULT_PATH = os.path.join(paths.plugins_dir(), "installed_plugins.json")
 
 
 def count_installed_plugins(path):

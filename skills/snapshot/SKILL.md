@@ -20,6 +20,8 @@ Capture the current state of the Claude Code ecosystem as a JSON baseline. On su
 - User wants to clean up — use `/moltbloat:clean`
 </Do_Not_Use_When>
 
+**Paths:** `~/.claude` below means the active Claude config dir (`$CLAUDE_CONFIG_DIR` when set, else `~/.claude`); `~/.moltbloat` means moltbloat's data dir for that config (`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home`). Bash blocks already resolve both; name the actual directories in the report.
+
 <Steps>
 
 1. **Parse subcommand and flags**
@@ -37,7 +39,7 @@ Capture the current state of the Claude Code ecosystem as a JSON baseline. On su
 3. **Check for existing baseline (snapshot mode)**
 
    ```bash
-   cat ~/.moltbloat/baseline.json 2>/dev/null
+   cat "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"/baseline.json 2>/dev/null
    ```
 
    If a baseline exists, load it for comparison. If not, this is the first snapshot.
@@ -48,7 +50,7 @@ Capture the current state of the Claude Code ecosystem as a JSON baseline. On su
 
    **4a. Plugins**
    ```bash
-   cat ~/.claude/plugins/installed_plugins.json 2>/dev/null
+   cat "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/installed_plugins.json 2>/dev/null
    ```
    Extract: name, version, enabled/disabled for each plugin.
 
@@ -56,39 +58,39 @@ Capture the current state of the Claude Code ecosystem as a JSON baseline. On su
    Count MCP servers from settings and plugin configs:
    ```bash
    # From global settings
-   cat ~/.claude/settings.json 2>/dev/null | grep -c '"mcpServers"' || echo 0
+   cat "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/settings.json 2>/dev/null | grep -c '"mcpServers"' || echo 0
    # From plugin MCP configs
-   find ~/.claude/plugins/cache -name ".mcp.json" -type f 2>/dev/null | wc -l
+   find "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache -name ".mcp.json" -type f 2>/dev/null | wc -l
    ```
 
    **4c. Skills count**
    ```bash
-   find ~/.claude/plugins/cache -path "*/skills/*/SKILL.md" -type f 2>/dev/null | wc -l
+   find "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache -path "*/skills/*/SKILL.md" -type f 2>/dev/null | wc -l
    ```
 
    **4d. Agents count**
    ```bash
-   ls ~/.claude/agents/*.md 2>/dev/null | wc -l
+   ls "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/agents/*.md 2>/dev/null | wc -l
    ```
 
    **4e. Rules**
    ```bash
-   ls -d ~/.claude/rules/*/ 2>/dev/null | xargs -I{} basename {}
+   ls -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/rules/*/ 2>/dev/null | xargs -I{} basename {}
    ```
 
    **4f. Disk usage**
    ```bash
-   du -sm ~/.claude/plugins/ 2>/dev/null | awk '{print $1}'
-   du -sm ~/.claude/projects/ 2>/dev/null | awk '{print $1}'
-   du -sm ~/.claude/ 2>/dev/null | awk '{print $1}'
+   du -sm "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/ 2>/dev/null | awk '{print $1}'
+   du -sm "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/projects/ 2>/dev/null | awk '{print $1}'
+   du -sm "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/ 2>/dev/null | awk '{print $1}'
    ```
 
    **4g. Token cost estimate**
    ```bash
    # Total bytes of context-loaded content
    total=0
-   for f in ~/.claude/CLAUDE.md; do [ -f "$f" ] && total=$((total + $(wc -c < "$f"))); done
-   find ~/.claude/rules -name "*.md" -type f -exec cat {} + 2>/dev/null | wc -c
+   for f in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/CLAUDE.md; do [ -f "$f" ] && total=$((total + $(wc -c < "$f"))); done
+   find "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/rules -name "*.md" -type f -exec cat {} + 2>/dev/null | wc -c
    ```
 
 5. **Build the snapshot JSON**
@@ -165,7 +167,7 @@ Capture the current state of the Claude Code ecosystem as a JSON baseline. On su
 7. **Save the new baseline and handle exports**
 
    ```bash
-   mkdir -p ~/.moltbloat
+   mkdir -p "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"
    ```
 
    If `--export <path>` was specified:
@@ -202,8 +204,8 @@ Capture the current state of the Claude Code ecosystem as a JSON baseline. On su
 8. **Trends mode — analyze history**
 
    ```bash
-   wc -l ~/.moltbloat/history.log 2>/dev/null
-   cat ~/.moltbloat/history.log 2>/dev/null
+   wc -l "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"/history.log 2>/dev/null
+   cat "$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)"/history.log 2>/dev/null
    ```
 
    If file doesn't exist or has < 2 entries:

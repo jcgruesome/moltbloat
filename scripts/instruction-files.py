@@ -27,6 +27,9 @@ import re
 import subprocess
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths  # noqa: E402  (active Claude config dir: $CLAUDE_CONFIG_DIR or ~/.claude)
+
 MAX_IMPORT_HOPS = 4
 MAX_LAZY_DEPTH = 6
 SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", "dist", "build", ".next"}
@@ -126,9 +129,9 @@ def encode_project_dir(path):
     return re.sub(r"[^A-Za-z0-9]", "-", os.path.realpath(path))
 
 
-def automem_path(home, project):
-    """Claude Code's auto memory index for a project."""
-    return os.path.join(home, ".claude", "projects", encode_project_dir(memory_root(project)),
+def automem_path(config_dir, project):
+    """Claude Code's auto memory index for a project, under the config dir."""
+    return os.path.join(config_dir, "projects", encode_project_dir(memory_root(project)),
                         "memory", "MEMORY.md")
 
 
@@ -160,7 +163,9 @@ def _lazy_claude_mds(project):
     return out
 
 
-def collect(project, home):
+def collect(project, home, config_dir=None):
+    """`config_dir` defaults to the active Claude config dir for `home`."""
+    cfg = config_dir or paths.config_dir(home)
     """All instruction files for `project`, as dicts {path, kind, load_mode, ...}."""
     project = os.path.realpath(project)
     files, warnings, seen = [], [], set()
@@ -176,7 +181,7 @@ def collect(project, home):
         if os.path.isfile(path):
             add_entry({"path": path, "kind": kind, "load_mode": mode})
 
-    add(os.path.join(home, ".claude", "CLAUDE.md"), "user")
+    add(os.path.join(cfg, "CLAUDE.md"), "user")
     # Claude Code reads CLAUDE.md in every ancestor up to, not including, "/".
     ancestors = []
     d = os.path.dirname(project)
@@ -190,8 +195,8 @@ def collect(project, home):
     add(os.path.join(project, ".claude", "CLAUDE.md"), "project")
     add(os.path.join(project, "CLAUDE.local.md"), "local")
     add(os.path.join(project, "AGENTS.md"), "agents")
-    add(automem_path(home, project), "automem")
-    for entry in (_rules(os.path.join(home, ".claude", "rules"), "user-rule", warnings)
+    add(automem_path(cfg, project), "automem")
+    for entry in (_rules(os.path.join(cfg, "rules"), "user-rule", warnings)
                   + _rules(os.path.join(project, ".claude", "rules"), "project-rule", warnings)
                   + _lazy_claude_mds(project)):
         add_entry(entry)
@@ -202,7 +207,8 @@ def collect(project, home):
         add_entry({"path": imp["path"], "kind": "import", "load_mode": "imported",
                    "parent_load_mode": imp["parent_load_mode"],
                    "imported_from": imp["imported_from"], "hop": imp["hop"]})
-    return {"project": project, "files": files, "unresolved_imports": unresolved, "warnings": warnings}
+    return {"project": project, "config_dir": cfg, "files": files,
+            "unresolved_imports": unresolved, "warnings": warnings}
 
 
 def mark_observed(result, ledger):
@@ -226,7 +232,8 @@ def mark_observed(result, ledger):
 
 
 def render_markdown(result):
-    lines = ["# Instruction Files", "", f"Project: {result['project']}", "",
+    lines = ["# Instruction Files", "", f"Project: {result['project']}",
+             f"Claude config: {result['config_dir']}", "",
              "| File | Kind | Loads | Seen loaded |", "|---|---|---|---|"]
     for f in result["files"]:
         seen = {True: "yes", False: "no", None: "-"}[f.get("observed")]
@@ -240,7 +247,7 @@ def render_markdown(result):
 
 
 def main(argv):
-    opts = {"--project": None, "--home": os.path.expanduser("~"), "--ledger-json": None}
+    opts = {"--project": None, "--home": os.path.expanduser("~"), "--ledger-json": None, "--config-dir": None}
     as_json = False
     args = argv[1:]
     i = 0
@@ -261,7 +268,7 @@ def main(argv):
     if not opts["--project"] or not os.path.isdir(opts["--project"]):
         sys.stderr.write(f"error: --project must be an existing directory (got {opts['--project']})\n")
         return 2
-    result = collect(opts["--project"], opts["--home"])
+    result = collect(opts["--project"], opts["--home"], opts["--config-dir"])
     if opts["--ledger-json"]:
         with open(opts["--ledger-json"], encoding="utf-8") as f:
             mark_observed(result, json.load(f))

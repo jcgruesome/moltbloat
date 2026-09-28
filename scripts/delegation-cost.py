@@ -39,8 +39,11 @@ import statistics
 import sys
 from datetime import datetime, timedelta, timezone
 
-PROJECTS_DIR = os.path.expanduser("~/.claude/projects")
-CONFIG_DIR = os.path.expanduser("~/.claude")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths  # noqa: E402  (active Claude config dir: $CLAUDE_CONFIG_DIR or ~/.claude)
+
+PROJECTS_DIR = paths.projects_dir()
+CONFIG_DIR = paths.config_dir()
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CACHE_WRITE_5M = 1.25
@@ -474,6 +477,7 @@ def prose_conflicts(instruction_paths, inventory):
 
 def render_markdown(result, unpinned, conflicts):
     L = ["# Delegation Cost", "",
+         f"Claude config: {result.get('config_dir', '')}",
          f"Subagent runs: {result['runs_scanned']}" + (f" (last {result['since_days']} days)" if result["since_days"] else ""),
          f"Measured spend: ${result['total_cost']:,.2f} (list prices; see Honest numbers)", "",
          "| Agent type | Model | Runs | Spend | Output tokens |", "|---|---|---|---|---|"]
@@ -538,6 +542,7 @@ def main(argv):
         rates = load_rates()
     runs = find_runs(opts["--projects-dir"], opts["--project"])
     result = analyze(runs, rates, since_days=since)
+    result["config_dir"] = opts["--config-dir"]
     inventory = agent_inventory(opts["--config-dir"], opts["--project"])
     unpinned = unpinned_findings(result, inventory)
     paths = [p for p in (opts["--instructions"] or "").split(",") if p]

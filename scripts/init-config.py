@@ -5,7 +5,9 @@ import os
 import sys
 from datetime import datetime, timezone
 
-CONFIG_PATH = os.path.expanduser("~/.moltbloat/config.json")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths  # noqa: E402  (per-config moltbloat data dir)
+CONFIG_PATH = os.path.join(paths.moltbloat_home(), "config.json")
 CONFIG_VERSION = "1.8"
 
 DEFAULT_CONFIG = {

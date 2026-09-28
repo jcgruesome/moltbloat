@@ -36,6 +36,8 @@ Run `/moltbloat:help` for the full command reference.
 
 ## Data Files
 
+Paths below are for the default config. With `CLAUDE_CONFIG_DIR` set, Claude Code's files (`~/.claude/...`) live in that directory, and moltbloat keeps its data (`~/.moltbloat/...`) in `~/.moltbloat/configs/<encoded config dir>/` so configs never mix usage or baselines. `scripts/paths.py` resolves both; scripts and skill bash blocks use it.
+
 - `~/.claude/projects/**/*.jsonl` — Claude Code's native session transcripts. Read-only by moltbloat; the **primary** usage source mined by `scripts/parse-history.py` for `/moltbloat:usage`.
 - `~/.moltbloat/usage.jsonl` — Usage tracking data (created automatically by PostToolUse hook; supplements native history)
 - `~/.moltbloat/usage.jsonl.bak` — Backup created before usage compaction
