@@ -19,6 +19,8 @@ Show what's actually being used versus what's just sitting there consuming conte
 - User wants a one-time structural audit — use `/moltbloat:audit`
 </Do_Not_Use_When>
 
+**Paths:** `~/.claude` means the active Claude config dir (`$CLAUDE_CONFIG_DIR` if set); `~/.moltbloat` means moltbloat's data dir for it (`scripts/paths.py moltbloat-home`).
+
 <Steps>
 
 1. **Mine native Claude Code history (primary source)**
@@ -59,12 +61,13 @@ Show what's actually being used versus what's just sitting there consuming conte
    truth — it only corroborates and fills any gaps (e.g. very recent sessions):
 
    ```bash
-   if [ -f ~/.moltbloat/usage.jsonl ] && [ "$(wc -l < ~/.moltbloat/usage.jsonl)" -gt 0 ]; then
+   MB="$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)" || exit 1
+   if [ -f "$MB"/usage.jsonl ] && [ "$(wc -l < "$MB"/usage.jsonl)" -gt 0 ]; then
      # Skill / agent / mcp / tool counts from the hook log
-     grep '"type":"skill"' ~/.moltbloat/usage.jsonl | grep -o '"name":"[^"]*"' | sort | uniq -c | sort -rn
-     grep '"type":"agent"' ~/.moltbloat/usage.jsonl | grep -o '"name":"[^"]*"' | sort | uniq -c | sort -rn
-     grep '"type":"mcp"'   ~/.moltbloat/usage.jsonl | grep -o '"name":"[^"]*"' | sort | uniq -c | sort -rn
-     grep '"type":"tool"'  ~/.moltbloat/usage.jsonl | grep -o '"name":"[^"]*"' | sort | uniq -c | sort -rn
+     grep '"type":"skill"' "$MB"/usage.jsonl | grep -o '"name":"[^"]*"' | sort | uniq -c | sort -rn
+     grep '"type":"agent"' "$MB"/usage.jsonl | grep -o '"name":"[^"]*"' | sort | uniq -c | sort -rn
+     grep '"type":"mcp"'   "$MB"/usage.jsonl | grep -o '"name":"[^"]*"' | sort | uniq -c | sort -rn
+     grep '"type":"tool"'  "$MB"/usage.jsonl | grep -o '"name":"[^"]*"' | sort | uniq -c | sort -rn
    fi
    ```
 
@@ -76,8 +79,9 @@ Show what's actually being used versus what's just sitting there consuming conte
    Count how many tool invocations were tracked (each one triggered the PostToolUse hook). Calculate the hook overhead:
 
    ```bash
-   total_invocations=$(wc -l < ~/.moltbloat/usage.jsonl)
-   unique_days=$(grep -o '"date":"[^"]*"' ~/.moltbloat/usage.jsonl | sort -u | wc -l)
+   MB="$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)" || exit 1
+   total_invocations=$(wc -l < "$MB"/usage.jsonl)
+   unique_days=$(grep -o '"date":"[^"]*"' "$MB"/usage.jsonl | sort -u | wc -l)
    ```
 
    For each active plugin with hooks (from `installed_plugins.json`), read its `hooks/hooks.json` and count:
@@ -110,14 +114,14 @@ Show what's actually being used versus what's just sitting there consuming conte
 
    ```bash
    # All installed skills
-   find ~/.claude/plugins/cache -path "*/skills/*/SKILL.md" -type f 2>/dev/null | sed 's|.*/skills/\([^/]*\)/.*|\1|' | sort -u
+   find "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache -path "*/skills/*/SKILL.md" -type f 2>/dev/null | sed 's|.*/skills/\([^/]*\)/.*|\1|' | sort -u
 
    # All installed agents
-   ls ~/.claude/agents/*.md 2>/dev/null | xargs -I{} basename {} .md
-   find ~/.claude/plugins/cache -path "*/agents/*.md" -type f 2>/dev/null | xargs -I{} basename {} .md | sort -u
+   ls "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/agents/*.md 2>/dev/null | xargs -I{} basename {} .md
+   find "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache -path "*/agents/*.md" -type f 2>/dev/null | xargs -I{} basename {} .md | sort -u
 
    # All MCP servers
-   find ~/.claude/plugins/cache -name ".mcp.json" -type f 2>/dev/null
+   find "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache -name ".mcp.json" -type f 2>/dev/null
    ```
 
    Cross-reference the **installed** inventory against the mined `items`. This is also
@@ -188,6 +192,7 @@ Show what's actually being used versus what's just sitting there consuming conte
    ```
    # Moltbloat Usage Report
 
+   **Claude config**: <config dir from `paths.py config-dir`> (moltbloat data: <`paths.py moltbloat-home`>)
    **Tracking period**: <first_used> to <last_used> (<N> days, from native history)
    **Sessions analyzed**: <scanned.files>   **Tool invocations**: <scanned.tool_uses>
    **Staleness window**: <stale_days> days
@@ -302,7 +307,8 @@ Show what's actually being used versus what's just sitting there consuming conte
 
    Check if the usage file has grown large enough to benefit from compaction:
    ```bash
-   wc -l < ~/.moltbloat/usage.jsonl 2>/dev/null
+   MB="$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)" || exit 1
+   wc -l < "$MB"/usage.jsonl 2>/dev/null
    ```
 
    Get thresholds from config:
@@ -331,12 +337,13 @@ Show what's actually being used versus what's just sitting there consuming conte
 
    **8c.** Write compacted file:
    ```bash
+   MB="$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)" || exit 1
    # Back up first
-   cp ~/.moltbloat/usage.jsonl ~/.moltbloat/usage.jsonl.bak
+   cp "$MB"/usage.jsonl "$MB"/usage.jsonl.bak
 
    # Write: old summaries + recent raw entries
-   cat <summaries> <recent_entries> > ~/.moltbloat/usage.jsonl.new
-   mv ~/.moltbloat/usage.jsonl.new ~/.moltbloat/usage.jsonl
+   cat <summaries> <recent_entries> > "$MB"/usage.jsonl.new
+   mv "$MB"/usage.jsonl.new "$MB"/usage.jsonl
    ```
 
    **8d.** Report:

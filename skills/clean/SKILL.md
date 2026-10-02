@@ -34,6 +34,8 @@ Act on findings from `/moltbloat:audit`. Walk through each finding interactively
   refuses if the file changed after the user reviewed the diff
 </Safety>
 
+**Paths:** `~/.claude` means the active Claude config dir (`$CLAUDE_CONFIG_DIR` if set); `~/.moltbloat` means moltbloat's data dir for it (`scripts/paths.py moltbloat-home`).
+
 <Steps>
 
 1. **Parse the command**

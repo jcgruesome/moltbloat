@@ -22,6 +22,8 @@ Run a comprehensive self-diagnostic on the moltbloat installation and its enviro
 - User wants general Claude Code troubleshooting — this is specifically for moltbloat
 </Do_Not_Use_When>
 
+**Paths:** `~/.claude` means the active Claude config dir (`$CLAUDE_CONFIG_DIR` if set); `~/.moltbloat` means moltbloat's data dir for it (`scripts/paths.py moltbloat-home`).
+
 <Steps>
 
 1. **Announce diagnostic**
@@ -52,25 +54,50 @@ Run a comprehensive self-diagnostic on the moltbloat installation and its enviro
 3. **Check moltbloat directory structure**
 
    ```bash
+   MB="$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)" || exit 1
    # Check if data directory exists and is writable
-   test -d "$HOME/.moltbloat" && echo "Data directory: exists" || echo "Data directory: missing"
-   test -w "$HOME/.moltbloat" 2>/dev/null && echo "Data directory: writable" || echo "Data directory: NOT writable"
+   test -d "$MB" && echo "Data directory: exists" || echo "Data directory: missing"
+   test -w "$MB" 2>/dev/null && echo "Data directory: writable" || echo "Data directory: NOT writable"
 
    # Check for expected files
-   ls -la "$HOME/.moltbloat/" 2>/dev/null || echo "No data files yet"
+   ls -la "$MB/" 2>/dev/null || echo "No data files yet"
+
+   # Which Claude config is active, and data left in the default location
+   echo "Claude config: $(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" config-dir)"
+   echo "moltbloat data: $MB"
+   DEF="$HOME/.moltbloat"
+   if [ "$MB" != "$DEF" ]; then
+     for f in usage.jsonl baseline.json history.log; do
+       if [ -f "$DEF/$f" ] && [ ! -f "$MB/$f" ]; then
+         echo "MIGRATION: $DEF/$f exists, but this config has none. If it was recorded under this config: mkdir -p \"$MB\" && cp \"$DEF/$f\" \"$MB/$f\""
+       fi
+     done
+     if [ -d "$DEF/profiles" ] && [ ! -d "$MB/profiles" ]; then
+       echo "MIGRATION: saved profiles are in $DEF/profiles; copy them with: cp -R \"$DEF/profiles\" \"$MB/\""
+     fi
+     if [ ! -f "$MB/config.json" ] && [ -f "$DEF/config.json" ]; then
+       echo "NOTE: this config inherits settings from $DEF/config.json until it has its own"
+     fi
+   fi
    ```
+
+   Data is kept per Claude config (see `scripts/paths.py`). Report every
+   `MIGRATION` line under Issues Found with its command; it applies to users
+   who ran moltbloat under this `CLAUDE_CONFIG_DIR` before this change, when all
+   configs shared `~/.moltbloat`. Do not copy anything yourself.
 
 4. **Check data file integrity**
 
    ```bash
+   MB="$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)" || exit 1
    # Check usage.jsonl validity (if exists)
-   if [ -f "$HOME/.moltbloat/usage.jsonl" ]; then
-     total=$(wc -l < "$HOME/.moltbloat/usage.jsonl")
-     valid=$(grep -c '"type":"' "$HOME/.moltbloat/usage.jsonl" 2>/dev/null || echo 0)
+   if [ -f "$MB/usage.jsonl" ]; then
+     total=$(wc -l < "$MB/usage.jsonl")
+     valid=$(grep -c '"type":"' "$MB/usage.jsonl" 2>/dev/null || echo 0)
      echo "usage.jsonl: $total lines, ~$valid valid entries"
      
      # Check for JSON parse errors
-     head -5 "$HOME/.moltbloat/usage.jsonl" | while read line; do
+     head -5 "$MB/usage.jsonl" | while read line; do
        python3 -c "import json; json.loads('$line')" 2>/dev/null && echo "JSON valid" || echo "JSON INVALID"
      done
    else
@@ -78,15 +105,15 @@ Run a comprehensive self-diagnostic on the moltbloat installation and its enviro
    fi
 
    # Check baseline.json validity (if exists)
-   if [ -f "$HOME/.moltbloat/baseline.json" ]; then
-     python3 -c "import json; json.load(open('$HOME/.moltbloat/baseline.json'))" 2>/dev/null && echo "baseline.json: valid" || echo "baseline.json: CORRUPT"
+   if [ -f "$MB/baseline.json" ]; then
+     python3 -c "import json; json.load(open('$MB/baseline.json'))" 2>/dev/null && echo "baseline.json: valid" || echo "baseline.json: CORRUPT"
    else
      echo "baseline.json: not created yet (normal)"
    fi
 
    # Check history.log (if exists)
-   if [ -f "$HOME/.moltbloat/history.log" ]; then
-     entries=$(wc -l < "$HOME/.moltbloat/history.log")
+   if [ -f "$MB/history.log" ]; then
+     entries=$(wc -l < "$MB/history.log")
      echo "history.log: $entries entries"
    else
      echo "history.log: not created yet (normal)"
@@ -116,7 +143,7 @@ Run a comprehensive self-diagnostic on the moltbloat installation and its enviro
 
    ```bash
    # Check if we can read the plugin registry
-   if [ -f "$HOME/.claude/plugins/installed_plugins.json" ]; then
+   if [ -f "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/installed_plugins.json" ]; then
      echo "Plugin registry: readable"
      plugin_count=$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/count-installed-plugins.py" 2>/dev/null || echo 0)
      echo "Installed plugins: $plugin_count"
@@ -125,8 +152,8 @@ Run a comprehensive self-diagnostic on the moltbloat installation and its enviro
    fi
 
    # Check plugin cache access
-   if [ -d "$HOME/.claude/plugins/cache" ]; then
-     cache_size=$(du -sm "$HOME/.claude/plugins/cache" 2>/dev/null | cut -f1)
+   if [ -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/cache" ]; then
+     cache_size=$(du -sm "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/cache" 2>/dev/null | cut -f1)
      echo "Plugin cache: ${cache_size}MB"
    else
      echo "Plugin cache: not found"
@@ -136,13 +163,14 @@ Run a comprehensive self-diagnostic on the moltbloat installation and its enviro
 7. **Test write operations**
 
    ```bash
+   MB="$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)" || exit 1
    # Test writing to moltbloat directory
-   testfile="$HOME/.moltbloat/.diagnose_test_$$"
+   testfile="$MB/.diagnose_test_$$"
    if echo "test" > "$testfile" 2>/dev/null; then
      rm "$testfile"
      echo "Write test: PASSED"
    else
-     echo "Write test: FAILED — check permissions on ~/.moltbloat/"
+     echo "Write test: FAILED: check permissions on $MB/"
    fi
    ```
 
@@ -155,20 +183,21 @@ Run a comprehensive self-diagnostic on the moltbloat installation and its enviro
    - Permission issues on scripts
 
    ```bash
+   MB="$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)" || exit 1
    # Check usage file size
-   if [ -f "$HOME/.moltbloat/usage.jsonl" ]; then
-     size=$(stat -f%z "$HOME/.moltbloat/usage.jsonl" 2>/dev/null || stat -c%s "$HOME/.moltbloat/usage.jsonl" 2>/dev/null || echo 0)
+   if [ -f "$MB/usage.jsonl" ]; then
+     size=$(stat -f%z "$MB/usage.jsonl" 2>/dev/null || stat -c%s "$MB/usage.jsonl" 2>/dev/null || echo 0)
      if [ "$size" -gt 10485760 ]; then
        echo "WARNING: usage.jsonl is >10MB — run '/moltbloat:usage' to compact"
      fi
    fi
 
    # Check for very old baseline
-   if [ -f "$HOME/.moltbloat/baseline.json" ]; then
+   if [ -f "$MB/baseline.json" ]; then
      age_days=$(python3 -c "
 import json, datetime, os
 try:
-    with open(os.path.expanduser('~/.moltbloat/baseline.json')) as f:
+    with open('$MB/baseline.json') as f:
         data = json.load(f)
     ts = data.get('timestamp', '2000-01-01')[:10]
     days = (datetime.date.today() - datetime.date.fromisoformat(ts)).days
@@ -194,7 +223,8 @@ except:
    - jq: <version> <✅/optional>
 
    ## Installation Health
-   - Data directory (~/.moltbloat): <✅/❌>
+   - Claude config: <config dir>
+   - Data directory (<moltbloat data dir>): <✅/❌>
    - Write permissions: <✅/❌>
    - Hook scripts: <✅/❌>
    - Syntax validation: <✅/❌>

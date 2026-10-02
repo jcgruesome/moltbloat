@@ -17,7 +17,10 @@ import os
 import re
 import sys
 
-PROJECTS_DIR = os.path.expanduser("~/.claude/projects")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths  # noqa: E402  (active Claude config dir: $CLAUDE_CONFIG_DIR or ~/.claude)
+
+PROJECTS_DIR = paths.projects_dir()
 CONNECTOR_PREFIX = "claude_ai_"
 DEFAULT_MIN_SHARED = 2
 # A tool suffix on more than this many distinct servers is a naming convention

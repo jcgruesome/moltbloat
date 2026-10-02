@@ -21,6 +21,8 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
 - User only wants token cost info — use `/moltbloat:token-budget` instead
 </Do_Not_Use_When>
 
+**Paths:** `~/.claude` means the active Claude config dir (`$CLAUDE_CONFIG_DIR` if set); `~/.moltbloat` means moltbloat's data dir for it (`scripts/paths.py moltbloat-home`).
+
 <Steps>
 
 1. **Parse arguments**
@@ -50,13 +52,13 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
 
    Check if Claude Code is initialized:
    ```bash
-   if [ ! -d "$HOME/.claude" ]; then
-     echo "ERROR: Claude Code not found at ~/.claude"
+   if [ ! -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}" ]; then
+     echo "ERROR: Claude Code not found at ${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
      echo "Please ensure Claude Code is installed and initialized."
      exit 1
    fi
    
-   if [ ! -f "$HOME/.claude/plugins/installed_plugins.json" ]; then
+   if [ ! -f "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/installed_plugins.json" ]; then
      echo "NOTE: No plugins installed yet. Audit will show empty ecosystem."
    fi
    ```
@@ -75,11 +77,12 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
 
    **Load usage data (if available):**
    ```bash
+   MB="$(python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paths.py" moltbloat-home)" || exit 1
    # Check if usage tracking data exists
-   wc -l ~/.moltbloat/usage.jsonl 2>/dev/null || echo 0
+   wc -l "$MB"/usage.jsonl 2>/dev/null || echo 0
    
    # Extract plugin usage counts from last 30 days
-   grep '"type":"skill"' ~/.moltbloat/usage.jsonl 2>/dev/null | \
+   grep '"type":"skill"' "$MB"/usage.jsonl 2>/dev/null | \
      grep -o '"name":"[^"]*"' | sort | uniq -c | sort -rn
    ```
 
@@ -96,19 +99,19 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
 
    **2a. Plugins**
    ```bash
-   cat ~/.claude/plugins/installed_plugins.json
+   cat "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/installed_plugins.json
    ```
    Parse the JSON. For each plugin, record: name, version, scope, enabled/disabled, lastUpdated.
 
    **2b. MCP Servers**
    Search for MCP configurations:
    ```bash
-   cat ~/.claude/settings.json  # check mcpServers key
-   cat ~/.claude/settings.local.json 2>/dev/null  # check mcpServers key
+   cat "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/settings.json  # check mcpServers key
+   cat "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/settings.local.json 2>/dev/null  # check mcpServers key
    ```
    Also check each installed plugin for `.mcp.json`:
    ```bash
-   find ~/.claude/plugins/cache -name ".mcp.json" -type f 2>/dev/null
+   find "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache -name ".mcp.json" -type f 2>/dev/null
    ```
    Build a combined list of all MCP servers with their source (global config vs plugin).
 
@@ -123,7 +126,7 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    an absent file is the common case, not a finding. Scan it and cross-reference
    against the servers gathered above:
    ```bash
-   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/managed-mcp-check.py" ~/.claude --json
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/managed-mcp-check.py" "${CLAUDE_CONFIG_DIR:-$HOME/.claude}" --json
    ```
    Add any name collision it reports into the combined MCP server list from
    step 2b as a `(managed)` source, so Check 2 and Check 11 below see it.
@@ -131,11 +134,11 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    **2c. Skills**
    Count skills per plugin:
    ```bash
-   for dir in ~/.claude/plugins/cache/*/*/skills/*/; do echo "$dir"; done 2>/dev/null
+   for dir in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/*/*/skills/*/; do echo "$dir"; done 2>/dev/null
    ```
    Also check for local skills:
    ```bash
-   ls ~/.claude/commands/ 2>/dev/null
+   ls "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/commands/ 2>/dev/null
    ```
    Claude Code also auto-loads skills from `~/.claude/skills/` and nested
    project-level `.claude/skills/` directly, no marketplace needed. Scan:
@@ -146,16 +149,16 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
 
    **2d. Agents**
    ```bash
-   ls ~/.claude/agents/*.md 2>/dev/null
+   ls "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/agents/*.md 2>/dev/null
    ```
    And plugin-provided agents:
    ```bash
-   find ~/.claude/plugins/cache -path "*/agents/*.md" -type f 2>/dev/null
+   find "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache -path "*/agents/*.md" -type f 2>/dev/null
    ```
 
    **2e. Rules**
    ```bash
-   find ~/.claude/rules -name "*.md" -type f 2>/dev/null
+   find "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/rules -name "*.md" -type f 2>/dev/null
    ```
 
    **2f. Claude.ai connector overlap**
@@ -168,19 +171,19 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    ```bash
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get thresholds.connector_overlap_min_shared_tools
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/init-config.py" --get thresholds.connector_overlap_boilerplate_df
-   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/connector-overlap.py" ~/.claude/projects --json \
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/connector-overlap.py" "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/projects --json \
      --min-shared <value above> --boilerplate-df <value above>
    ```
    If `~/.claude/projects` has no transcripts yet, note that and move on.
 
    **2g. Projects**
    ```bash
-   du -sh ~/.claude/projects/*/ 2>/dev/null | sort -rh
+   du -sh "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/projects/*/ 2>/dev/null | sort -rh
    ```
 
    **2h. Stale data**
    ```bash
-   du -sh ~/.claude/plugins/cache/*/*/*/ 2>/dev/null | sort -rh | head -20
+   du -sh "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/*/*/*/ 2>/dev/null | sort -rh | head -20
    ```
 
 3. **Run redundancy checks**
@@ -228,7 +231,7 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    Compare agents across sources:
    ```bash
    # Local agents
-   ls ~/.claude/agents/*.md 2>/dev/null | xargs -I{} basename {} .md | sort > /tmp/local_agents.txt
+   ls "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/agents/*.md 2>/dev/null | xargs -I{} basename {} .md | sort > /tmp/local_agents.txt
    
    # Plugin agents (from active install paths only)
    for plugin_dir in <active install paths>; do
@@ -276,7 +279,7 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    Get the stale threshold from config (default 1 MB):
    Check `~/.claude/projects/` for directories that don't correspond to any existing project path:
    ```bash
-   for dir in ~/.claude/projects/*/; do
+   for dir in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/projects/*/; do
      dirname=$(basename "$dir")
      # Claude Code encodes paths by replacing / with -
      # Reconstruct: leading - becomes /, remaining - become /
@@ -295,7 +298,7 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
 ### Check 10: Hook Conflicts and Context Injection Load
    **Collect hook registrations from active plugins only:**
    ```bash
-   cat ~/.claude/plugins/installed_plugins.json 2>/dev/null
+   cat "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/installed_plugins.json 2>/dev/null
    # Extract installPath for each enabled plugin
    ```
 
@@ -344,10 +347,10 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    done
    
    # From global config
-   cat ~/.claude/settings.json 2>/dev/null | grep -A100 '"mcpServers"'
+   cat "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/settings.json 2>/dev/null | grep -A100 '"mcpServers"'
 
    # From org-managed settings (step 2b) — absent on most machines
-   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/managed-mcp-check.py" ~/.claude --json
+   python3 "${CLAUDE_PLUGIN_ROOT}/scripts/managed-mcp-check.py" "${CLAUDE_CONFIG_DIR:-$HOME/.claude}" --json
    ```
 
    Flag if same MCP server name appears from multiple sources (e.g., playwright from both global config AND plugin, or a `managedMcpServers` entry colliding with either).
@@ -565,6 +568,7 @@ Audit the entire Claude Code ecosystem (~/.claude/) and produce a severity-rated
    # Moltbloat Ecosystem Audit
 
    **Scanned**: <timestamp>
+   **Claude config**: <config dir from `paths.py config-dir`> (moltbloat data: <`paths.py moltbloat-home`>)
    **Claude Code version**: <version from `claude --version` if available>
    **Total plugins**: X enabled, Y disabled
    **Total MCP servers**: Z

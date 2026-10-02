@@ -130,3 +130,6 @@ jobs:
 
       - name: Run clean apply tests
         run: python3 scripts/test-apply-instruction-change.py
+
+      - name: Run config dir tests
+        run: python3 scripts/test-paths.py

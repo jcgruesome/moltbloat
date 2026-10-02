@@ -19,6 +19,8 @@ Fast, focused answer to "what does plugin X do and should I keep it?" Shows what
 - User wants a full audit — use `/moltbloat:audit`
 </Do_Not_Use_When>
 
+**Paths:** `~/.claude` means the active Claude config dir (`$CLAUDE_CONFIG_DIR` if set); `~/.moltbloat` means moltbloat's data dir for it (`scripts/paths.py moltbloat-home`).
+
 <Steps>
 
 1. **Parse the plugin name**
@@ -30,14 +32,14 @@ Fast, focused answer to "what does plugin X do and should I keep it?" Shows what
 
    ```bash
    # Check if installed
-   cat ~/.claude/plugins/installed_plugins.json 2>/dev/null | grep -i "<plugin_name>"
+   cat "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/installed_plugins.json 2>/dev/null | grep -i "<plugin_name>"
    ```
 
    If not found, tell the user it's not installed and stop.
 
    Find its cache directory:
    ```bash
-   find ~/.claude/plugins/cache -maxdepth 2 -type d -name "<plugin_name>" 2>/dev/null
+   find "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache -maxdepth 2 -type d -name "<plugin_name>" 2>/dev/null
    ```
 
 3. **Quick inventory**
@@ -73,15 +75,15 @@ Fast, focused answer to "what does plugin X do and should I keep it?" Shows what
 
    # Check if any other plugin has same skill names
    for skill in $skill_names; do
-     find ~/.claude/plugins/cache -path "*/skills/$skill/SKILL.md" -not -path "*/<plugin_name>/*" 2>/dev/null
+     find "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache -path "*/skills/$skill/SKILL.md" -not -path "*/<plugin_name>/*" 2>/dev/null
    done
    ```
 
    Check for agent overlaps:
    ```bash
    for agent in $(find "$PLUGIN_DIR/agents" -name "*.md" -type f 2>/dev/null | xargs -I{} basename {} .md); do
-     ls ~/.claude/agents/$agent.md 2>/dev/null
-     find ~/.claude/plugins/cache -path "*/agents/$agent.md" -not -path "*/<plugin_name>/*" 2>/dev/null
+     ls "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/agents/$agent.md 2>/dev/null
+     find "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache -path "*/agents/$agent.md" -not -path "*/<plugin_name>/*" 2>/dev/null
    done
    ```
 

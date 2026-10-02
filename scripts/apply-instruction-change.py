@@ -17,7 +17,7 @@ Every action:
   --expect-sha256 H    required to write: the sha256 from the reviewed dry run.
                        Refused (exit 3) if the file changed since.
   --backup-root DIR    backup location (default: a new directory under
-                       ~/.moltbloat/backups/). An existing backup is never
+                       <moltbloat data dir>/backups/, see paths.py). An existing backup is never
                        overwritten.
 
 Refused (exit 3): files owned by an installed plugin (under the plugins dir
@@ -34,6 +34,9 @@ import shutil
 import sys
 import tempfile
 from datetime import datetime, timezone
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths  # noqa: E402  (active Claude config dir and per-config moltbloat data dir)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PIN_MODELS = ("haiku", "sonnet", "opus", "fable")
@@ -70,7 +73,7 @@ def _under(path, root):
 
 
 def config_dir(home):
-    return os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(home, ".claude")
+    return paths.config_dir(home)
 
 
 def plugin_roots(home):
@@ -156,7 +159,7 @@ def new_pin_model(text, model):
 
 
 def _backup_root(home):
-    base = os.path.join(home, ".moltbloat", "backups")
+    base = os.path.join(paths.moltbloat_home(home), "backups")
     os.makedirs(base, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
     return tempfile.mkdtemp(prefix=stamp + "-", dir=base)

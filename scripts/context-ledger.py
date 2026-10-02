@@ -28,8 +28,11 @@ import re
 import statistics
 import sys
 
-PROJECTS_DIR = os.path.expanduser("~/.claude/projects")
-CONFIG_DIR = os.path.expanduser("~/.claude")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths  # noqa: E402  (active Claude config dir: $CLAUDE_CONFIG_DIR or ~/.claude)
+
+PROJECTS_DIR = paths.projects_dir()
+CONFIG_DIR = paths.config_dir()
 
 
 def server_of(tool_name):
@@ -524,6 +527,7 @@ def _top(mapping, n=10):
 def render_markdown(ledger):
     src = ledger["sources"]
     lines = ["# Measured Context Ledger", "",
+             f"Claude config: {ledger.get('config_dir', '')}",
              f"Sessions scanned: {ledger['scanned_sessions']}"
              + (" (skipped non-interactive: " + ", ".join(f"{k} {v}" for k, v in sorted(ledger["skipped_entrypoints"].items())) + ")"
                 if ledger["skipped_entrypoints"] else "")]
@@ -624,6 +628,7 @@ def main(argv):
         sys.stderr.write(f"error: no interactive sessions among {len(files)} transcripts "
                          f"(skipped: {ledger['skipped_entrypoints']}); pass --include-sdk to measure them\n")
         return 1
+    ledger["config_dir"] = config_dir
     ledger["plugin_costs"] = plugin_costs(ledger["sources"], installed_plugin_names(config_dir), tpb)
     print(json.dumps(ledger, indent=2) if as_json else render_markdown(ledger))
     return 0

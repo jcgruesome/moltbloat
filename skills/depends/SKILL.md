@@ -19,6 +19,8 @@ Map the dependency graph of the Claude Code ecosystem. For any plugin, show exac
 - User wants a quick single-plugin lookup — use `/moltbloat:why`
 </Do_Not_Use_When>
 
+**Paths:** `~/.claude` means the active Claude config dir (`$CLAUDE_CONFIG_DIR` if set); `~/.moltbloat` means moltbloat's data dir for it (`scripts/paths.py moltbloat-home`).
+
 <Steps>
 
 1. **Determine scope**
@@ -30,7 +32,7 @@ Map the dependency graph of the Claude Code ecosystem. For any plugin, show exac
    For each enabled plugin, scan its cached directory to catalog what it provides:
 
    ```bash
-   PLUGIN_DIR=~/.claude/plugins/cache/<marketplace>/<plugin>/<version>
+   PLUGIN_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/<marketplace>/<plugin>/<version>
    ```
 
    **Skills:**
@@ -81,7 +83,7 @@ Map the dependency graph of the Claude Code ecosystem. For any plugin, show exac
    Build a grep pattern dynamically from all installed plugin names, then check if any plugin's skills or hooks reference another plugin:
    ```bash
    # Build pattern from all installed plugin names (excluding the current one)
-   pattern=$(cat ~/.claude/plugins/installed_plugins.json 2>/dev/null | grep -oE '"[^"]+@[^"]+' | sed 's/^"//' | cut -d'@' -f1 | grep -v "<current_plugin>" | paste -sd'|' -)
+   pattern=$(cat "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/installed_plugins.json 2>/dev/null | grep -oE '"[^"]+@[^"]+' | sed 's/^"//' | cut -d'@' -f1 | grep -v "<current_plugin>" | paste -sd'|' -)
    grep -rE "$pattern" "$PLUGIN_DIR/skills/" "$PLUGIN_DIR/hooks/" 2>/dev/null
    ```
 

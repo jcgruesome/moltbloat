@@ -5,8 +5,11 @@ import datetime
 import os
 import sys
 
-baseline_path = os.path.expanduser("~/.moltbloat/baseline.json")
-config_path = os.path.expanduser("~/.moltbloat/config.json")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths  # noqa: E402  (per-config moltbloat data dir)
+MOLTBLOAT_HOME = paths.moltbloat_home()
+baseline_path = os.path.join(MOLTBLOAT_HOME, "baseline.json")
+config_path = os.path.join(MOLTBLOAT_HOME, "config.json")
 
 # Default threshold
 STALE_DAYS = 30
@@ -31,7 +34,7 @@ try:
     if days > STALE_DAYS:
         # Stop fires after every response; a marker keeps the reminder to
         # once per day instead of repeating it every turn.
-        marker_path = os.path.expanduser("~/.moltbloat/.snapshot-reminder-shown")
+        marker_path = os.path.join(MOLTBLOAT_HOME, ".snapshot-reminder-shown")
         today = datetime.date.today().isoformat()
         if os.path.exists(marker_path):
             with open(marker_path) as f:

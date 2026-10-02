@@ -4,13 +4,17 @@
 Emits a FACTS document (markdown, or JSON with --json) — the shared ground truth
 handed to every deep-audit subagent. Stdlib only.
 Usage: deep-recon.py [CONFIG_DIR] [--json]; CONFIG_DIR defaults to $CLAUDE_CONFIG_DIR
-then ~/.claude. State file (.claude.json) found in $HOME or inside CONFIG_DIR (fixtures).
+then ~/.claude. State file (.claude.json): ~/.claude.json for the default config,
+else inside CONFIG_DIR (see paths.state_file).
 """
 import json
 import os
 import re
 import subprocess
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths  # noqa: E402  (active Claude config dir and its state file)
 
 def run(argv):
     """Run a command without a shell (paths are user input — no injection surface)."""
@@ -333,15 +337,13 @@ def to_markdown(facts):
 def main():
     args = [a for a in sys.argv[1:] if a != "--json"]
     as_json = "--json" in sys.argv
-    config_dir = os.path.expanduser(args[0] if args else os.environ.get("CLAUDE_CONFIG_DIR", "~/.claude"))
+    config_dir = os.path.expanduser(args[0]) if args else paths.config_dir()
     if not os.path.isdir(config_dir):
         print(f"ERROR: config dir not found: {config_dir}", file=sys.stderr)
         sys.exit(1)
-    state_candidates = [os.path.join(os.path.expanduser("~"), ".claude.json"),
-                        os.path.join(config_dir, ".claude.json")]
-    if os.path.realpath(config_dir) != os.path.realpath(os.path.expanduser("~/.claude")):
-        state_candidates.reverse()  # fixture layout: prefer sibling state file
-    state_path = next((p for p in state_candidates if os.path.isfile(p)), state_candidates[0])
+    # Default config: ~/.claude.json. Any other config dir (CLAUDE_CONFIG_DIR,
+    # or a fixture) keeps its state file inside that dir.
+    state_path = paths.state_file(config_dir)
     facts = collect(config_dir, state_path)
     print(json.dumps(facts, indent=1, default=str) if as_json else to_markdown(facts))
 

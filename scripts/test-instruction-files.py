@@ -12,6 +12,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 _spec = importlib.util.spec_from_file_location("instruction_files", os.path.join(HERE, "instruction-files.py"))
 inf = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(inf)
+os.environ.pop("CLAUDE_CONFIG_DIR", None)
 
 
 def _assert(cond, msg):
@@ -50,7 +51,7 @@ def run():
         write(os.path.join(proj, "sub", "CLAUDE.md"), "nested\n@./local-import.md\n")
         write(os.path.join(proj, ".claude", "rules", "broken.md"), "---\npaths: x\nno close\n")
         write(os.path.join(proj, "node_modules", "x", "CLAUDE.md"), "vendored\n")
-        write(inf.automem_path(home, proj), "- memory index\n")
+        write(inf.automem_path(os.path.join(home, ".claude"), proj), "- memory index\n")
 
         print("Test: collect labels each file with its load mode")
         r = inf.collect(proj, home)
@@ -64,7 +65,7 @@ def run():
         _assert(f[os.path.join(real, ".claude", "rules", "ts.md")]["load_mode"] == "path-scoped", "rule with paths: path-scoped")
         _assert(f[os.path.join(real, "sub", "CLAUDE.md")]["load_mode"] == "lazy", "nested CLAUDE.md lazy")
         _assert(not any("node_modules" in p for p in f), "node_modules skipped")
-        _assert(f[inf.automem_path(home, proj)]["kind"] == "automem", "auto memory MEMORY.md found")
+        _assert(f[inf.automem_path(os.path.join(home, ".claude"), proj)]["kind"] == "automem", "auto memory MEMORY.md found")
         _assert(f[os.path.join(home, "CLAUDE.md")]["kind"] == "ancestor", "~/CLAUDE.md read as an ancestor")
         _assert(any("broken.md" in w for w in r["warnings"]), "unclosed frontmatter warned")
 
@@ -123,6 +124,21 @@ def run():
         _assert(f[os.path.join(real, "sub", "CLAUDE.md")]["observed"] is None, "lazy file not judged")
         r2 = inf.mark_observed(inf.collect(proj, home), {"sources": {}})
         _assert(all(x["observed"] is None for x in r2["files"]), "no ledger samples: nothing judged")
+
+        print("Test: a non-default Claude config dir supplies the user files")
+        alt = os.path.join(d, "alt-config")
+        write(os.path.join(alt, "CLAUDE.md"), "alt user rules\n")
+        write(os.path.join(alt, "rules", "r.md"), "alt rule\n")
+        r_alt = inf.collect(proj, home, config_dir=alt)
+        fa = by_path(r_alt)
+        _assert(os.path.join(alt, "CLAUDE.md") in fa and os.path.join(home, ".claude", "CLAUDE.md") not in fa,
+                "user CLAUDE.md read from the given config dir, not ~/.claude")
+        _assert(os.path.join(alt, "rules", "r.md") in fa and r_alt["config_dir"] == alt, "user rules from it too")
+        os.environ["CLAUDE_CONFIG_DIR"] = alt
+        try:
+            _assert(inf.collect(proj, home)["config_dir"] == alt, "CLAUDE_CONFIG_DIR picked up by default")
+        finally:
+            os.environ.pop("CLAUDE_CONFIG_DIR")
 
         print("Test: main exit codes")
         _assert(inf.main(["x", "--project", os.path.join(d, "nope")]) == 2, "missing project dir -> 2")

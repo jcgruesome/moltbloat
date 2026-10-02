@@ -26,6 +26,7 @@ def _assert(cond, msg):
 
 def run_hook(home):
     env = dict(os.environ, HOME=home)
+    env.pop("CLAUDE_CONFIG_DIR", None)
     out = subprocess.run([sys.executable, SCRIPT], env=env, capture_output=True, text=True, check=True)
     return out.stdout
 

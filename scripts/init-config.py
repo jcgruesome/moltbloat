@@ -5,7 +5,13 @@ import os
 import sys
 from datetime import datetime, timezone
 
-CONFIG_PATH = os.path.expanduser("~/.moltbloat/config.json")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths  # noqa: E402  (per-config moltbloat data dir)
+CONFIG_PATH = os.path.join(paths.moltbloat_home(), "config.json")
+# A non-default Claude config inherits the default config's moltbloat
+# settings (thresholds, rates) until it has a config.json of its own.
+INHERITED_CONFIG_PATH = (None if paths.is_default_config()
+                         else os.path.join(paths.default_moltbloat_home(), "config.json"))
 CONFIG_VERSION = "1.8"
 
 DEFAULT_CONFIG = {
@@ -221,10 +227,14 @@ def load_config():
     call --get/--dump, and read-only skills must not rewrite the user's file;
     only --init (init_config) creates or migrates it on disk.
     """
-    if not os.path.exists(CONFIG_PATH):
-        return migrate_config({})
+    source = CONFIG_PATH
+    if not os.path.exists(source):
+        if INHERITED_CONFIG_PATH and os.path.exists(INHERITED_CONFIG_PATH):
+            source = INHERITED_CONFIG_PATH
+        else:
+            return migrate_config({})
     try:
-        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+        with open(source, 'r', encoding='utf-8') as f:
             user_config = json.load(f)
     except (json.JSONDecodeError, IOError) as e:
         print(f"Error loading config: {e}, using defaults", file=sys.stderr)

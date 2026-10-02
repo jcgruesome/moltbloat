@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **`CLAUDE_CONFIG_DIR` is followed everywhere.** Only three scripts honored
+  it; the rest, the usage hook, and every skill read `~/.claude`, so a
+  session under another config dir got reports about the default one.
+  `scripts/paths.py` now resolves the active config dir for all scripts,
+  hooks, and skill commands, and reports name the config they measured.
+  `managed-mcp-check.py` read the default config's `~/.claude.json` under
+  another config dir, reporting false collisions.
+
+### Changed
+- **moltbloat data is kept per Claude config.** The default config keeps
+  `~/.moltbloat`; any other `CLAUDE_CONFIG_DIR` uses
+  `~/.moltbloat/configs/<dir>-<hash>/`, so configs never mix usage logs or
+  baselines. If you already ran moltbloat with `CLAUDE_CONFIG_DIR` set, your
+  earlier data is still in `~/.moltbloat`: `/moltbloat:diagnose` prints the
+  copy command. Settings (`config.json`) are inherited from `~/.moltbloat`
+  until a config has its own.
+
 ## [0.13.0] - 2026-09-28
 
 Measured context, instruction quality, and delegation cost. Every number is
