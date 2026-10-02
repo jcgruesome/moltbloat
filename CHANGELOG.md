@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-10-02
+
+moltbloat follows `CLAUDE_CONFIG_DIR` and keeps data per Claude config (#24).
+
 ### Fixed
 - **`CLAUDE_CONFIG_DIR` is followed everywhere.** Only three scripts honored
   it; the rest, the usage hook, and every skill read `~/.claude`, so a
